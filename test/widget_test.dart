@@ -1,30 +1,56 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:besocial_app/core/network/api_envelope.dart';
+import 'package:besocial_app/core/network/api_exception.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:besocial_app/main.dart';
-
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('ApiEnvelope', () {
+    test('decodes a success envelope', () {
+      final json = {
+        'success': true,
+        'data': {'hello': 'world'},
+        'error': null,
+      };
+      final env = ApiEnvelope<Map<String, dynamic>>.fromJson(
+        json,
+        (j) => j as Map<String, dynamic>,
+      );
+      expect(env.success, isTrue);
+      expect(env.data, {'hello': 'world'});
+      expect(env.error, isNull);
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('decodes an error envelope', () {
+      final json = {
+        'success': false,
+        'data': null,
+        'error': {'message': 'nope', 'code': 'INVALID_TOKEN'},
+      };
+      final env = ApiEnvelope<Object>.fromJson(json, (j) => j as Object);
+      expect(env.success, isFalse);
+      expect(env.data, isNull);
+      expect(env.error?.code, 'INVALID_TOKEN');
+      expect(env.error?.message, 'nope');
+    });
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  group('ApiException', () {
+    test('fromEnvelope copies code + message', () {
+      final ex = ApiException.fromEnvelope(
+        const ApiError(message: 'gone', code: 'POST_NOT_FOUND'),
+        httpStatus: 404,
+      );
+      expect(ex.code, 'POST_NOT_FOUND');
+      expect(ex.message, 'gone');
+      expect(ex.httpStatus, 404);
+      expect(ex.isTransport, isFalse);
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('synthetic CLIENT_* codes are transport-level', () {
+      const ex = ApiException(
+        code: ApiException.codeTimeout,
+        message: 'slow',
+      );
+      expect(ex.isTransport, isTrue);
+    });
   });
 }

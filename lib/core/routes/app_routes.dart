@@ -8,9 +8,9 @@ import 'package:get/get.dart';
 ///
 /// Pattern (per `application-folder-structure.md`):
 ///   GetPage(
-///     name: AppRoutes.<route>,
-///     page: () => const <View>(),
-///     binding: <Bindings>(),
+///     name: AppRoutes.`route`,
+///     page: () => const `View`(),
+///     binding: `Bindings`(),
 ///     transition: Transition.fadeIn,
 ///     middlewares: [/* AuthMiddleware() */],
 ///   )
