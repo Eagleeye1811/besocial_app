@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../common_widgets/dash_shell.dart';
 import '../../../controllers/home_controller/home_controller.dart';
+import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_constants.dart';
 import '../../../data/dto/dashboard_home_dto.dart';
 import '../widgets/metric_card.dart';
@@ -59,17 +60,30 @@ class _Greeting extends GetView<HomeController> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            greeting,
-            style: TextStyle(
-              fontFamily: AppFonts.display,
-              fontFamilyFallback: AppFonts.displayFallback,
-              fontSize: 28,
-              fontWeight: FontWeight.w500,
-              letterSpacing: -0.6,
-              height: 1.1,
-              color: AppColors.ink,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  greeting,
+                  style: TextStyle(
+                    fontFamily: AppFonts.display,
+                    fontFamilyFallback: AppFonts.displayFallback,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -0.6,
+                    height: 1.1,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                color: AppColors.ink2,
+                tooltip: 'Settings',
+                onPressed: () => Get.toNamed<void>(AppRoutes.settings),
+              ),
+            ],
           ),
           if (home?.headline != null) ...[
             const SizedBox(height: 8),
