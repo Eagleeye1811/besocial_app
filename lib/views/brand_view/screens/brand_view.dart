@@ -7,6 +7,7 @@ import '../../../core/theme/theme_constants.dart';
 import '../widgets/assets_section.dart';
 import '../widgets/content_prefs_section.dart';
 import '../widgets/identity_section.dart';
+import '../widgets/instagram_section.dart';
 import '../widgets/niche_section.dart';
 import '../widgets/voice_visual_section.dart';
 
@@ -73,6 +74,7 @@ class BrandView extends GetView<BrandController> {
                 _Header(),
                 const SizedBox(height: 16),
                 IdentitySection(profile: profile),
+                const InstagramSection(),
                 NicheSection(profile: profile),
                 VoiceVisualSection(profile: profile),
                 ContentPrefsSection(profile: profile),

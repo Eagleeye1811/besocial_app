@@ -67,12 +67,37 @@ class _OAuthWebViewViewState extends State<OAuthWebViewView> {
     _resultDispatched = true;
 
     final uri = Uri.parse(url);
+    final error = uri.queryParameters['error'];
+
+    // Instagram callback rides on query params (?success=true&username=…),
+    // not a URL fragment, so it gets its own branch before the Google
+    // fragment-parsing logic.
+    if (uri.path.endsWith('/onboarding/instagram-connect')) {
+      if (error != null) {
+        Get.back<OAuthResult>(result: OAuthError(error));
+        return;
+      }
+      final ok = uri.queryParameters['success'] == 'true';
+      if (!ok) {
+        Get.back<OAuthResult>(
+          result: const OAuthError(OAuthError.clientMissingToken),
+        );
+        return;
+      }
+      Get.back<OAuthResult>(
+        result: InstagramConnectSuccess(
+          username: uri.queryParameters['username'],
+        ),
+      );
+      return;
+    }
+
+    // Google callback: `#token=…&new_user=…` fragment OR `?error=…` query.
     final fragmentParams = uri.fragment.isEmpty
         ? const <String, String>{}
         : Uri.splitQueryString(uri.fragment);
     final token = fragmentParams['token'];
     final newUserFlag = fragmentParams['new_user'];
-    final error = uri.queryParameters['error'];
 
     if (error != null) {
       Get.back<OAuthResult>(result: OAuthError(error));

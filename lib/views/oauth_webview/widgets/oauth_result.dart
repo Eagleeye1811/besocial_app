@@ -14,6 +14,15 @@ class OAuthSuccess extends OAuthResult {
   const OAuthSuccess({required this.token, required this.isNewUser});
 }
 
+/// Returned when the WebView intercepts the Instagram OAuth callback
+/// (`/onboarding/instagram-connect?success=true&username=…`). The backend
+/// has already persisted the credentials at this point; the username is
+/// passed through purely so the caller can flash a confirmation.
+class InstagramConnectSuccess extends OAuthResult {
+  final String? username;
+  const InstagramConnectSuccess({this.username});
+}
+
 class OAuthError extends OAuthResult {
   /// Raw reason string the backend supplied via `?error=…`, or one of the
   /// synthetic client codes ([clientCancelled], [clientMissingToken]) for

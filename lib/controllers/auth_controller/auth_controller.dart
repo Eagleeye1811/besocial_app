@@ -105,6 +105,12 @@ class AuthController extends GetxController {
         case OAuthError():
           if (result.reason == OAuthError.clientCancelled) return;
           errorMessage.value = _oauthErrorCopy(result.reason);
+        case InstagramConnectSuccess():
+          // Should not be reachable from the Google OAuth URL — the
+          // WebView only emits this variant for the IG callback path.
+          // Treat as a hard error if it ever leaks here.
+          errorMessage.value = 'Unexpected Instagram callback during sign-in.';
+          _log.w('signInWithGoogle received InstagramConnectSuccess');
       }
     } on ApiException catch (e) {
       errorMessage.value = resolveApiExceptionMessage(e);

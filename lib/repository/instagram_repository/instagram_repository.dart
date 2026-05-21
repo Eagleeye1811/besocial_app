@@ -17,23 +17,38 @@ class InstagramPostResult {
   });
 }
 
-/// Instagram integration surface. Phase 10 only needs the post endpoint;
-/// Phase 12 will extend this with `getAuthUrl` / `getStatus` for the
-/// connect flow. Keep the abstraction so Phase 12 can add methods without
-/// rewriting callers.
+/// Instagram integration surface — auth URL, status, and post.
 abstract class InstagramRepository {
+  /// `GET /api/v1/instagram/auth-url` — returns the URL to load in the
+  /// in-app WebView. Side-effect: the backend wipes any prior IG creds
+  /// the moment this is called, so don't call it speculatively.
+  Future<String> getAuthUrl();
+
+  /// `GET /api/v1/instagram/status`.
+  Future<InstagramStatusModel> getStatus();
+
   /// Publish a completed generation job to the user's connected IG account.
   Future<InstagramPostResult> postToInstagram(String jobId);
-
-  /// Mirror of `GET /api/v1/instagram/status`. Phase 12 wires the connect
-  /// flow; consumers today only need the boolean to gate the Post Now CTA.
-  Future<InstagramStatusModel> getStatus();
 }
 
 class InstagramRepositoryImpl implements InstagramRepository {
   final Dio _dio;
 
   InstagramRepositoryImpl(DioClient client) : _dio = client.dio;
+
+  @override
+  Future<String> getAuthUrl() async {
+    final response = await _dio.get<dynamic>('/api/v1/instagram/auth-url');
+    return (response.data as Map<String, dynamic>)['auth_url'] as String;
+  }
+
+  @override
+  Future<InstagramStatusModel> getStatus() async {
+    final response = await _dio.get<dynamic>('/api/v1/instagram/status');
+    return InstagramStatusModel.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
 
   @override
   Future<InstagramPostResult> postToInstagram(String jobId) async {
@@ -44,14 +59,6 @@ class InstagramRepositoryImpl implements InstagramRepository {
       igPostId: data['ig_post_id'] as String,
       permalink: data['permalink'] as String?,
       slideCount: data['slide_count'] as int,
-    );
-  }
-
-  @override
-  Future<InstagramStatusModel> getStatus() async {
-    final response = await _dio.get<dynamic>('/api/v1/instagram/status');
-    return InstagramStatusModel.fromJson(
-      response.data as Map<String, dynamic>,
     );
   }
 }
