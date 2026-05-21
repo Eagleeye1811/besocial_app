@@ -7,6 +7,7 @@ import 'core/services/logger_service.dart';
 import 'core/services/secure_storage_service.dart';
 import 'core/services/storage_service.dart';
 import 'repository/auth_repository/auth_repository.dart';
+import 'repository/onboarding_repository/onboarding_repository.dart';
 import 'repository/session_repository/session_repository.dart';
 
 /// Application-wide service locator.
@@ -48,6 +49,9 @@ Future<void> setupDependencyInjection() async {
   );
   getIt.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(getIt<DioClient>()),
+  );
+  getIt.registerLazySingleton<OnboardingRepository>(
+    () => OnboardingRepositoryImpl(getIt<DioClient>()),
   );
 
   // ==========================================

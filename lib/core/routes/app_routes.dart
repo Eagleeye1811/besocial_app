@@ -1,16 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_it/get_it.dart';
 
 import '../../controllers/auth_controller/auth_bindings.dart';
+import '../../controllers/onboarding_controller/onboarding_bindings.dart';
 import '../../controllers/splash_controller/splash_bindings.dart';
 import '../../views/oauth_webview/screens/oauth_webview_view.dart';
+import '../../views/onboarding/steps/analyzing_niche_step.dart';
+import '../../views/onboarding/steps/analyzing_posts_step.dart';
+import '../../views/onboarding/steps/brand_assets_step.dart';
+import '../../views/onboarding/steps/brand_details_step.dart';
+import '../../views/onboarding/steps/business_type_step.dart';
+import '../../views/onboarding/steps/colors_voice_step.dart';
+import '../../views/onboarding/steps/detected_style_step.dart';
+import '../../views/onboarding/steps/fetching_posts_step.dart';
+import '../../views/onboarding/steps/inspiration_step.dart';
+import '../../views/onboarding/steps/niche_results_step.dart';
+import '../../views/onboarding/steps/style_intro_step.dart';
+import '../../views/onboarding/steps/style_selection_step.dart';
 import '../../views/request_access_view/screens/request_access_view.dart';
 import '../../views/splash_view/screens/splash_view.dart';
 import '../../views/welcome_view/screens/welcome_view.dart';
 import '../services/auth_service.dart';
 import '../theme/theme_constants.dart';
 import 'auth_middleware.dart';
-import 'package:get_it/get_it.dart';
 
 /// Centralized route registry. Routes graduate from placeholder to full
 /// view phase by phase; `home` is a stub today and gets replaced in Phase 6.
@@ -18,7 +31,7 @@ class AppRoutes {
   AppRoutes._();
 
   // ==========================================
-  // Route names
+  // Auth / shell
   // ==========================================
   static const String splash = '/';
   static const String welcome = '/welcome';
@@ -27,9 +40,26 @@ class AppRoutes {
   static const String home = '/home';
 
   // ==========================================
+  // Onboarding wizard
+  // ==========================================
+  static const String onboardingBusinessType = '/onboarding/business-type';
+  static const String onboardingBrandDetails = '/onboarding/brand-details';
+  static const String onboardingAnalyzingNiche = '/onboarding/analyzing-niche';
+  static const String onboardingNicheResults = '/onboarding/niche-results';
+  static const String onboardingStyleIntro = '/onboarding/style-intro';
+  static const String onboardingAnalyzingPosts = '/onboarding/analyzing-posts';
+  static const String onboardingDetectedStyle = '/onboarding/detected-style';
+  static const String onboardingStyleSelection = '/onboarding/style-selection';
+  static const String onboardingColorsVoice = '/onboarding/colors-voice';
+  static const String onboardingBrandAssets = '/onboarding/brand-assets';
+  static const String onboardingFetchingPosts = '/onboarding/fetching-posts';
+  static const String onboardingInspiration = '/onboarding/inspiration';
+
+  // ==========================================
   // Route pages
   // ==========================================
   static final List<GetPage<dynamic>> routes = <GetPage<dynamic>>[
+    // ----- Auth / shell -----
     GetPage<void>(
       name: splash,
       page: () => const SplashView(),
@@ -58,6 +88,80 @@ class AppRoutes {
       page: () => const _HomePlaceholderView(),
       transition: Transition.fadeIn,
       middlewares: [AuthMiddleware()],
+    ),
+
+    // ----- Onboarding -----
+    GetPage<void>(
+      name: onboardingBusinessType,
+      page: () => const BusinessTypeStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage<void>(
+      name: onboardingBrandDetails,
+      page: () => const BrandDetailsStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage<void>(
+      name: onboardingAnalyzingNiche,
+      page: () => const AnalyzingNicheStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.fadeIn,
+    ),
+    GetPage<void>(
+      name: onboardingNicheResults,
+      page: () => const NicheResultsStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage<void>(
+      name: onboardingStyleIntro,
+      page: () => const StyleIntroStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage<void>(
+      name: onboardingAnalyzingPosts,
+      page: () => const AnalyzingPostsStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.fadeIn,
+    ),
+    GetPage<void>(
+      name: onboardingDetectedStyle,
+      page: () => const DetectedStyleStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage<void>(
+      name: onboardingStyleSelection,
+      page: () => const StyleSelectionStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage<void>(
+      name: onboardingColorsVoice,
+      page: () => const ColorsVoiceStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage<void>(
+      name: onboardingBrandAssets,
+      page: () => const BrandAssetsStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage<void>(
+      name: onboardingFetchingPosts,
+      page: () => const FetchingPostsStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.fadeIn,
+    ),
+    GetPage<void>(
+      name: onboardingInspiration,
+      page: () => const InspirationStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
     ),
   ];
 }

@@ -56,14 +56,8 @@ class AuthController extends GetxController {
       final inviteToken = await _authRepo.validateInvite(code);
       await _secure.writeInviteToken(inviteToken);
       await _session.ensureSessionId();
-      _log.i('Invite accepted; routing into onboarding');
-      // Phase 4 will register `AppRoutes.onboardingBusiness` etc. For now,
-      // stay on welcome — the user can sign in with Google to test e2e.
-      Get.snackbar(
-        'Invite accepted',
-        'Onboarding wizard arrives in Phase 4.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _log.i('Invite accepted; routing into onboarding wizard');
+      Get.offNamed<void>(AppRoutes.onboardingBusinessType);
     } on ApiException catch (e) {
       errorMessage.value = resolveApiExceptionMessage(e);
     } finally {
