@@ -4,11 +4,13 @@ import 'package:get/get.dart';
 import '../../common_widgets/dash_shell.dart';
 import '../../controllers/auth_controller/auth_bindings.dart';
 import '../../controllers/discover_controller/discover_bindings.dart';
+import '../../controllers/drafts_controller/drafts_bindings.dart';
 import '../../controllers/home_controller/home_bindings.dart';
 import '../../controllers/onboarding_controller/onboarding_bindings.dart';
 import '../../controllers/shortlist_controller/shortlist_bindings.dart';
 import '../../controllers/splash_controller/splash_bindings.dart';
 import '../../views/discover_view/screens/discover_view.dart';
+import '../../views/drafts_view/screens/drafts_view.dart';
 import '../../views/home_view/screens/home_view.dart';
 import '../../views/shortlist_view/screens/shortlist_view.dart';
 import '../../views/oauth_webview/screens/oauth_webview_view.dart';
@@ -131,11 +133,8 @@ class AppRoutes {
     ),
     GetPage<void>(
       name: drafts,
-      page: () => const _DashPlaceholder(
-        tab: DashTab.drafts,
-        phase: 'Phase 10',
-        title: 'Drafts',
-      ),
+      page: () => const DraftsView(),
+      binding: DraftsBindings(),
       transition: Transition.fadeIn,
       middlewares: [AuthMiddleware()],
     ),
