@@ -1,14 +1,15 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../common_widgets/dash_shell.dart';
 import '../../controllers/auth_controller/auth_bindings.dart';
+import '../../controllers/brand_controller/brand_bindings.dart';
 import '../../controllers/discover_controller/discover_bindings.dart';
 import '../../controllers/drafts_controller/drafts_bindings.dart';
 import '../../controllers/home_controller/home_bindings.dart';
 import '../../controllers/onboarding_controller/onboarding_bindings.dart';
 import '../../controllers/shortlist_controller/shortlist_bindings.dart';
 import '../../controllers/splash_controller/splash_bindings.dart';
+import '../../views/brand_view/screens/brand_view.dart';
 import '../../views/discover_view/screens/discover_view.dart';
 import '../../views/drafts_view/screens/drafts_view.dart';
 import '../../views/home_view/screens/home_view.dart';
@@ -32,7 +33,6 @@ import '../../views/onboarding/steps/style_selection_step.dart';
 import '../../views/request_access_view/screens/request_access_view.dart';
 import '../../views/splash_view/screens/splash_view.dart';
 import '../../views/welcome_view/screens/welcome_view.dart';
-import '../theme/theme_constants.dart';
 import 'auth_middleware.dart';
 
 /// Centralized route registry. Routes graduate from placeholder to full
@@ -140,11 +140,8 @@ class AppRoutes {
     ),
     GetPage<void>(
       name: brand,
-      page: () => const _DashPlaceholder(
-        tab: DashTab.brand,
-        phase: 'Phase 11',
-        title: 'Brand',
-      ),
+      page: () => const BrandView(),
+      binding: BrandBindings(),
       transition: Transition.fadeIn,
       middlewares: [AuthMiddleware()],
     ),
@@ -248,49 +245,3 @@ class AppRoutes {
   ];
 }
 
-/// Stand-in for not-yet-built dashboard tabs. Wrapped in [DashShell] so the
-/// bottom-nav still works, just shows a "coming in Phase N" body.
-class _DashPlaceholder extends StatelessWidget {
-  final DashTab tab;
-  final String phase;
-  final String title;
-
-  const _DashPlaceholder({
-    required this.tab,
-    required this.phase,
-    required this.title,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return DashShell(
-      currentTab: tab,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontFamily: AppFonts.display,
-                  fontFamilyFallback: AppFonts.displayFallback,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ink,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Arrives in $phase.',
-                style: TextStyle(fontSize: 13, color: AppColors.ink3),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

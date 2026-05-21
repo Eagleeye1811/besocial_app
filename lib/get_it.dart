@@ -7,6 +7,7 @@ import 'core/services/logger_service.dart';
 import 'core/services/secure_storage_service.dart';
 import 'core/services/storage_service.dart';
 import 'repository/auth_repository/auth_repository.dart';
+import 'repository/brand_repository/brand_repository.dart';
 import 'repository/dashboard_repository/dashboard_repository.dart';
 import 'repository/discover_repository/discover_repository.dart';
 import 'repository/drafts_repository/drafts_repository.dart';
@@ -76,6 +77,9 @@ Future<void> setupDependencyInjection() async {
   );
   getIt.registerLazySingleton<InstagramRepository>(
     () => InstagramRepositoryImpl(getIt<DioClient>()),
+  );
+  getIt.registerLazySingleton<BrandRepository>(
+    () => BrandRepositoryImpl(getIt<DioClient>()),
   );
 
   // ==========================================
