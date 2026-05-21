@@ -12,6 +12,7 @@ import 'repository/discover_repository/discover_repository.dart';
 import 'repository/generation_repository/generation_repository.dart';
 import 'repository/onboarding_repository/onboarding_repository.dart';
 import 'repository/session_repository/session_repository.dart';
+import 'repository/shortlist_repository/shortlist_repository.dart';
 
 /// Application-wide service locator.
 ///
@@ -64,6 +65,9 @@ Future<void> setupDependencyInjection() async {
   );
   getIt.registerLazySingleton<DiscoverRepository>(
     () => DiscoverRepositoryImpl(getIt<DioClient>()),
+  );
+  getIt.registerLazySingleton<ShortlistRepository>(
+    () => ShortlistRepositoryImpl(getIt<DioClient>()),
   );
 
   // ==========================================

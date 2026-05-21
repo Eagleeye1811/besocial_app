@@ -6,9 +6,11 @@ import '../../controllers/auth_controller/auth_bindings.dart';
 import '../../controllers/discover_controller/discover_bindings.dart';
 import '../../controllers/home_controller/home_bindings.dart';
 import '../../controllers/onboarding_controller/onboarding_bindings.dart';
+import '../../controllers/shortlist_controller/shortlist_bindings.dart';
 import '../../controllers/splash_controller/splash_bindings.dart';
 import '../../views/discover_view/screens/discover_view.dart';
 import '../../views/home_view/screens/home_view.dart';
+import '../../views/shortlist_view/screens/shortlist_view.dart';
 import '../../views/oauth_webview/screens/oauth_webview_view.dart';
 import '../../views/onboarding/steps/analyzing_niche_step.dart';
 import '../../views/onboarding/steps/analyzing_posts_step.dart';
@@ -122,11 +124,8 @@ class AppRoutes {
     ),
     GetPage<void>(
       name: shortlist,
-      page: () => const _DashPlaceholder(
-        tab: DashTab.shortlist,
-        phase: 'Phase 8',
-        title: 'Shortlist',
-      ),
+      page: () => const ShortlistView(),
+      binding: ShortlistBindings(),
       transition: Transition.fadeIn,
       middlewares: [AuthMiddleware()],
     ),
