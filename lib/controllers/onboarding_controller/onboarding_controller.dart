@@ -11,10 +11,12 @@ import '../../core/services/polling_service.dart';
 import '../../core/services/secure_storage_service.dart';
 import '../../data/dto/onboarding_dto.dart';
 import '../../data/models/analysis_data_model.dart';
+import '../../data/models/generation_job_model.dart';
 import '../../data/models/niche_data_model.dart';
 import '../../data/models/post_data_model.dart';
 import '../../data/models/session_model.dart';
 import '../../data/models/trending_post_model.dart';
+import '../../repository/generation_repository/generation_repository.dart';
 import '../../repository/onboarding_repository/onboarding_repository.dart';
 import '../../repository/session_repository/session_repository.dart';
 import '../../views/onboarding/onboarding_steps_config.dart';
@@ -28,6 +30,7 @@ import '../auth_controller/auth_controller.dart';
 /// store keeps the same slice of state and the same step-by-step mutations.
 class OnboardingController extends GetxController {
   final OnboardingRepository _repo = GetIt.I<OnboardingRepository>();
+  final GenerationRepository _generation = GetIt.I<GenerationRepository>();
   final SessionRepository _session = GetIt.I<SessionRepository>();
   final SecureStorageService _secure = GetIt.I<SecureStorageService>();
   final LoggerService _log = GetIt.I<LoggerService>();
@@ -61,6 +64,10 @@ class OnboardingController extends GetxController {
   final RxSet<String> shortlistedPostIds = <String>{}.obs;
   final RxSet<String> skippedPostIds = <String>{}.obs;
   final RxnString pickedPostId = RxnString();
+
+  // ===== Generation (Phase 5 tail) =====
+  final Rxn<GenerationJobModel> currentJob = Rxn<GenerationJobModel>();
+  PollerCancel? _generationCancel;
 
   // ===== Loading / error =====
   final RxBool isLoading = false.obs;
@@ -286,9 +293,69 @@ class OnboardingController extends GetxController {
   Future<void> _triggerGoogleHandoff() async {
     final inviteToken = await _secure.readInviteToken();
     final auth = Get.find<AuthController>();
-    await auth.signInWithGoogle(inviteToken: inviteToken);
-    // After successful OAuth, AuthController routes to /home (Phase 5 will
-    // replace the destination with the JWT-gated `generating` step).
+    await auth.signInWithGoogle(
+      inviteToken: inviteToken,
+      destinationRoute: AppRoutes.onboardingGenerating,
+    );
+  }
+
+  // ===========================================
+  // Step 14 — generating (JWT-gated, polls /generation/{job_id})
+  // ===========================================
+  Future<void> triggerGeneration() async {
+    if (isLoading.value) return;
+    isLoading.value = true;
+    errorMessage.value = null;
+    _generationCancel = PollerCancel();
+    try {
+      final jobId = await _generation.createJob();
+      currentJob.value = GenerationJobModel(
+        jobId: jobId,
+        status: GenerationJobStatus.pending,
+        slides: const [],
+      );
+      // Live-update the observable as the poller advances so the UI status
+      // text reflects each phase change.
+      final terminal = await Poller.until<GenerationJobModel>(
+        fetch: () async {
+          final next = await _generation.getJob(jobId);
+          currentJob.value = next;
+          return next;
+        },
+        isTerminal: (j) => j.isTerminal,
+        initialDelay: const Duration(seconds: 3),
+        maxDelay: const Duration(seconds: 8),
+        backoffFactor: 1.4,
+        timeout: const Duration(minutes: 8),
+        cancel: _generationCancel,
+      );
+      if (terminal.status == GenerationJobStatus.completed) {
+        Get.offNamed<void>(AppRoutes.onboardingResult);
+      } else {
+        errorMessage.value =
+            terminal.errorMessage ?? 'Generation failed. Try again.';
+      }
+    } on ApiException catch (e) {
+      errorMessage.value = resolveApiExceptionMessage(e);
+      _log.w('Generation failed: ${e.code} ${e.message}');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void cancelGeneration() => _generationCancel?.cancel();
+
+  /// Bail out of the generating step on failure — onboarding still counts
+  /// as complete because `has_completed_onboarding` is derived server-side
+  /// from the IG profile, which was set during step 3.
+  void skipGenerationToComplete() {
+    cancelGeneration();
+    Get.offAllNamed(AppRoutes.onboardingComplete);
+  }
+
+  /// From the result screen, advance to the celebration screen.
+  void completeOnboardingFromResult() {
+    Get.offNamed<void>(AppRoutes.onboardingComplete);
   }
 
   // ===========================================

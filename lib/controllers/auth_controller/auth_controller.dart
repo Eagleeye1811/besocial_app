@@ -65,10 +65,18 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Returning-user path. Open Google OAuth in the in-app WebView with only
-  /// the session id (no invite token) — the backend skips the invite gate
-  /// when `google_sub` already maps to a user.
-  Future<void> signInWithGoogle({String? inviteToken}) async {
+  /// Open Google OAuth in the in-app WebView.
+  ///
+  /// - Welcome's "Sign in with Google" link calls this with no [inviteToken]
+  ///   (returning user) and no override on [destinationRoute] — lands at
+  ///   `/home`.
+  /// - The inspiration step's first-heart handoff calls this with the
+  ///   stored invite token (new-user signup) and `destinationRoute =
+  ///   AppRoutes.onboardingGenerating` so the wizard resumes JWT-gated.
+  Future<void> signInWithGoogle({
+    String? inviteToken,
+    String destinationRoute = AppRoutes.home,
+  }) async {
     if (isBusy) return;
     isStartingGoogleSignIn.value = true;
     errorMessage.value = null;
@@ -93,7 +101,7 @@ class AuthController extends GetxController {
         case OAuthSuccess():
           await _auth.acceptOAuthJwt(result.token);
           await _secure.clearInviteToken();
-          Get.offAllNamed(AppRoutes.home);
+          Get.offAllNamed(destinationRoute);
         case OAuthError():
           if (result.reason == OAuthError.clientCancelled) return;
           errorMessage.value = _oauthErrorCopy(result.reason);

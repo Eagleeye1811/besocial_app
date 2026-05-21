@@ -31,6 +31,10 @@ class OnboardingFlow {
     OnboardingStep(route: AppRoutes.onboardingBrandAssets, displayStep: 7),
     OnboardingStep(route: AppRoutes.onboardingFetchingPosts),
     OnboardingStep(route: AppRoutes.onboardingInspiration, displayStep: 8),
+    // JWT-gated tail — transition screens after OAuth promotion.
+    OnboardingStep(route: AppRoutes.onboardingGenerating),
+    OnboardingStep(route: AppRoutes.onboardingResult),
+    OnboardingStep(route: AppRoutes.onboardingComplete),
   ];
 
   static String? next(String currentRoute) {

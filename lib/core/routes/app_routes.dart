@@ -12,10 +12,13 @@ import '../../views/onboarding/steps/brand_assets_step.dart';
 import '../../views/onboarding/steps/brand_details_step.dart';
 import '../../views/onboarding/steps/business_type_step.dart';
 import '../../views/onboarding/steps/colors_voice_step.dart';
+import '../../views/onboarding/steps/complete_step.dart';
 import '../../views/onboarding/steps/detected_style_step.dart';
 import '../../views/onboarding/steps/fetching_posts_step.dart';
+import '../../views/onboarding/steps/generating_step.dart';
 import '../../views/onboarding/steps/inspiration_step.dart';
 import '../../views/onboarding/steps/niche_results_step.dart';
+import '../../views/onboarding/steps/result_step.dart';
 import '../../views/onboarding/steps/style_intro_step.dart';
 import '../../views/onboarding/steps/style_selection_step.dart';
 import '../../views/request_access_view/screens/request_access_view.dart';
@@ -54,6 +57,11 @@ class AppRoutes {
   static const String onboardingBrandAssets = '/onboarding/brand-assets';
   static const String onboardingFetchingPosts = '/onboarding/fetching-posts';
   static const String onboardingInspiration = '/onboarding/inspiration';
+
+  // JWT-gated tail
+  static const String onboardingGenerating = '/onboarding/generating';
+  static const String onboardingResult = '/onboarding/result';
+  static const String onboardingComplete = '/onboarding/complete';
 
   // ==========================================
   // Route pages
@@ -162,6 +170,29 @@ class AppRoutes {
       page: () => const InspirationStep(),
       binding: OnboardingBindings(),
       transition: Transition.rightToLeft,
+    ),
+
+    // ----- JWT-gated tail -----
+    GetPage<void>(
+      name: onboardingGenerating,
+      page: () => const GeneratingStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.fadeIn,
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage<void>(
+      name: onboardingResult,
+      page: () => const ResultStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.rightToLeft,
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage<void>(
+      name: onboardingComplete,
+      page: () => const CompleteStep(),
+      binding: OnboardingBindings(),
+      transition: Transition.fadeIn,
+      middlewares: [AuthMiddleware()],
     ),
   ];
 }
