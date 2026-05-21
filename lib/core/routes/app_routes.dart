@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get_it/get_it.dart';
 
+import '../../common_widgets/dash_shell.dart';
 import '../../controllers/auth_controller/auth_bindings.dart';
+import '../../controllers/home_controller/home_bindings.dart';
 import '../../controllers/onboarding_controller/onboarding_bindings.dart';
 import '../../controllers/splash_controller/splash_bindings.dart';
+import '../../views/home_view/screens/home_view.dart';
 import '../../views/oauth_webview/screens/oauth_webview_view.dart';
 import '../../views/onboarding/steps/analyzing_niche_step.dart';
 import '../../views/onboarding/steps/analyzing_posts_step.dart';
@@ -24,12 +26,13 @@ import '../../views/onboarding/steps/style_selection_step.dart';
 import '../../views/request_access_view/screens/request_access_view.dart';
 import '../../views/splash_view/screens/splash_view.dart';
 import '../../views/welcome_view/screens/welcome_view.dart';
-import '../services/auth_service.dart';
 import '../theme/theme_constants.dart';
 import 'auth_middleware.dart';
 
 /// Centralized route registry. Routes graduate from placeholder to full
-/// view phase by phase; `home` is a stub today and gets replaced in Phase 6.
+/// view phase by phase; the dashboard cluster (`/home` real, `/discover`,
+/// `/shortlist`, `/drafts`, `/brand`) all share [DashShell] and bottom-nav
+/// between each other.
 class AppRoutes {
   AppRoutes._();
 
@@ -40,7 +43,15 @@ class AppRoutes {
   static const String welcome = '/welcome';
   static const String requestAccess = '/request-access';
   static const String oauthWebview = '/oauth/webview';
+
+  // ==========================================
+  // Dashboard cluster
+  // ==========================================
   static const String home = '/home';
+  static const String discover = '/discover';
+  static const String shortlist = '/shortlist';
+  static const String drafts = '/drafts';
+  static const String brand = '/brand';
 
   // ==========================================
   // Onboarding wizard
@@ -91,9 +102,52 @@ class AppRoutes {
       transition: Transition.downToUp,
       fullscreenDialog: true,
     ),
+
+    // ----- Dashboard cluster -----
     GetPage<void>(
       name: home,
-      page: () => const _HomePlaceholderView(),
+      page: () => const HomeView(),
+      binding: HomeBindings(),
+      transition: Transition.fadeIn,
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage<void>(
+      name: discover,
+      page: () => const _DashPlaceholder(
+        tab: DashTab.discover,
+        phase: 'Phase 7',
+        title: 'Discover',
+      ),
+      transition: Transition.fadeIn,
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage<void>(
+      name: shortlist,
+      page: () => const _DashPlaceholder(
+        tab: DashTab.shortlist,
+        phase: 'Phase 8',
+        title: 'Shortlist',
+      ),
+      transition: Transition.fadeIn,
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage<void>(
+      name: drafts,
+      page: () => const _DashPlaceholder(
+        tab: DashTab.drafts,
+        phase: 'Phase 10',
+        title: 'Drafts',
+      ),
+      transition: Transition.fadeIn,
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage<void>(
+      name: brand,
+      page: () => const _DashPlaceholder(
+        tab: DashTab.brand,
+        phase: 'Phase 11',
+        title: 'Brand',
+      ),
       transition: Transition.fadeIn,
       middlewares: [AuthMiddleware()],
     ),
@@ -197,63 +251,48 @@ class AppRoutes {
   ];
 }
 
-/// Temporary stand-in until Phase 6 lands the real dashboard home. Lets us
-/// verify the full sign-in round-trip end-to-end.
-class _HomePlaceholderView extends StatelessWidget {
-  const _HomePlaceholderView();
+/// Stand-in for not-yet-built dashboard tabs. Wrapped in [DashShell] so the
+/// bottom-nav still works, just shows a "coming in Phase N" body.
+class _DashPlaceholder extends StatelessWidget {
+  final DashTab tab;
+  final String phase;
+  final String title;
+
+  const _DashPlaceholder({
+    required this.tab,
+    required this.phase,
+    required this.title,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final auth = GetIt.I<AuthService>();
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Home'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await auth.logout();
-              Get.offAllNamed(AppRoutes.welcome);
-            },
-          ),
-        ],
-      ),
+    return DashShell(
+      currentTab: tab,
       body: Center(
-        child: Obx(() {
-          final user = auth.currentUserRx.value;
-          return Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  user == null ? 'Signed in.' : 'Signed in as',
-                  style: TextStyle(color: AppColors.ink3, fontSize: 14),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontFamily: AppFonts.display,
+                  fontFamilyFallback: AppFonts.displayFallback,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ink,
+                  letterSpacing: -0.5,
                 ),
-                if (user != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    user.email,
-                    style: TextStyle(
-                      fontFamily: AppFonts.ui,
-                      fontFamilyFallback: AppFonts.uiFallback,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                Text(
-                  'Dashboard home arrives in Phase 6.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.ink3, fontSize: 13),
-                ),
-              ],
-            ),
-          );
-        }),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Arrives in $phase.',
+                style: TextStyle(fontSize: 13, color: AppColors.ink3),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

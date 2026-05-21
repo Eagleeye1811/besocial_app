@@ -7,6 +7,7 @@ import 'core/services/logger_service.dart';
 import 'core/services/secure_storage_service.dart';
 import 'core/services/storage_service.dart';
 import 'repository/auth_repository/auth_repository.dart';
+import 'repository/dashboard_repository/dashboard_repository.dart';
 import 'repository/generation_repository/generation_repository.dart';
 import 'repository/onboarding_repository/onboarding_repository.dart';
 import 'repository/session_repository/session_repository.dart';
@@ -56,6 +57,9 @@ Future<void> setupDependencyInjection() async {
   );
   getIt.registerLazySingleton<GenerationRepository>(
     () => GenerationRepositoryImpl(getIt<DioClient>()),
+  );
+  getIt.registerLazySingleton<DashboardRepository>(
+    () => DashboardRepositoryImpl(getIt<DioClient>()),
   );
 
   // ==========================================
