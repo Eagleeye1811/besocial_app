@@ -17,31 +17,11 @@ class BeSocialApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'BeSocial',
+      title: 'Growgram',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       initialRoute: AppRoutes.splash,
       getPages: AppRoutes.routes,
-      // While AppRoutes.routes is empty (Phase 1), render a placeholder so the
-      // engine has a Material context to attach to. Removed in Phase 3 when
-      // the splash + welcome views land.
-      home: const _BootPlaceholder(),
-    );
-  }
-}
-
-class _BootPlaceholder extends StatelessWidget {
-  const _BootPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text(
-          'BeSocial — Phase 1 bootstrap complete.',
-          textAlign: TextAlign.center,
-        ),
-      ),
     );
   }
 }

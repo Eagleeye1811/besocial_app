@@ -6,9 +6,10 @@ import '../constants/app_keys.dart';
 /// and any short-lived OAuth tokens. Non-sensitive prefs belong in
 /// [StorageService] (Hive) instead.
 ///
-/// Android uses `EncryptedSharedPreferences`; iOS uses Keychain with
-/// `first_unlock_this_device` so a logged-in user can resume after reboot
-/// without re-entering biometrics.
+/// iOS uses Keychain with `first_unlock_this_device` so a logged-in user can
+/// resume after reboot without re-entering biometrics. Android uses the
+/// library default (`EncryptedSharedPreferences` was deprecated upstream and
+/// is now provided transparently).
 class SecureStorageService {
   final FlutterSecureStorage _storage;
 
@@ -28,10 +29,30 @@ class SecureStorageService {
 
   Future<void> clearJwt() => _storage.delete(key: AppKeys.secureKeys.jwt);
 
-  // ===== Onboarding session pair =====
+  // ===== Onboarding session ID =====
+  Future<String?> readSessionId() =>
+      _storage.read(key: AppKeys.secureKeys.sessionId);
+
+  Future<void> writeSessionId(String id) =>
+      _storage.write(key: AppKeys.secureKeys.sessionId, value: id);
+
+  Future<void> clearSessionId() =>
+      _storage.delete(key: AppKeys.secureKeys.sessionId);
+
+  // ===== Onboarding session token (minted by POST /onboarding/profile) =====
+  Future<String?> readSessionToken() =>
+      _storage.read(key: AppKeys.secureKeys.sessionToken);
+
+  Future<void> writeSessionToken(String token) =>
+      _storage.write(key: AppKeys.secureKeys.sessionToken, value: token);
+
+  Future<void> clearSessionToken() =>
+      _storage.delete(key: AppKeys.secureKeys.sessionToken);
+
+  // ===== Convenience: read/write/clear both at once =====
   Future<({String? id, String? token})> readSessionPair() async {
-    final id = await _storage.read(key: AppKeys.secureKeys.sessionId);
-    final token = await _storage.read(key: AppKeys.secureKeys.sessionToken);
+    final id = await readSessionId();
+    final token = await readSessionToken();
     return (id: id, token: token);
   }
 
@@ -39,19 +60,16 @@ class SecureStorageService {
     required String sessionId,
     required String sessionToken,
   }) async {
-    await _storage.write(key: AppKeys.secureKeys.sessionId, value: sessionId);
-    await _storage.write(
-      key: AppKeys.secureKeys.sessionToken,
-      value: sessionToken,
-    );
+    await writeSessionId(sessionId);
+    await writeSessionToken(sessionToken);
   }
 
   Future<void> clearSessionPair() async {
-    await _storage.delete(key: AppKeys.secureKeys.sessionId);
-    await _storage.delete(key: AppKeys.secureKeys.sessionToken);
+    await clearSessionId();
+    await clearSessionToken();
   }
 
-  // ===== Short-lived invite token (between /invite/validate and /google) =====
+  // ===== Short-lived invite token =====
   Future<String?> readInviteToken() =>
       _storage.read(key: AppKeys.secureKeys.inviteToken);
 
@@ -62,7 +80,5 @@ class SecureStorageService {
       _storage.delete(key: AppKeys.secureKeys.inviteToken);
 
   /// Wipe every secret. Called on logout.
-  Future<void> clearAll() async {
-    await _storage.deleteAll();
-  }
+  Future<void> clearAll() => _storage.deleteAll();
 }

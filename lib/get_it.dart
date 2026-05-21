@@ -1,10 +1,13 @@
 import 'package:get_it/get_it.dart';
 
 import 'core/network/dio_client.dart';
+import 'core/services/auth_service.dart';
 import 'core/services/db_service.dart';
 import 'core/services/logger_service.dart';
 import 'core/services/secure_storage_service.dart';
 import 'core/services/storage_service.dart';
+import 'repository/auth_repository/auth_repository.dart';
+import 'repository/session_repository/session_repository.dart';
 
 /// Application-wide service locator.
 ///
@@ -38,17 +41,29 @@ Future<void> setupDependencyInjection() async {
   );
 
   // ==========================================
-  // 3. Business Services (Phase 3+)
+  // 3. Repositories
   // ==========================================
-  // getIt.registerLazySingleton<AuthService>(...)
+  getIt.registerLazySingleton<SessionRepository>(
+    () => SessionRepository(getIt<SecureStorageService>()),
+  );
+  getIt.registerLazySingleton<AuthRepository>(
+    () => AuthRepositoryImpl(getIt<DioClient>()),
+  );
 
   // ==========================================
-  // 4. Repositories (Phase 3+)
+  // 4. Business Services
   // ==========================================
-  // getIt.registerLazySingleton<AuthRepository>(...)
+  getIt.registerLazySingleton<AuthService>(
+    () => AuthService(
+      repo: getIt<AuthRepository>(),
+      session: getIt<SessionRepository>(),
+      secure: getIt<SecureStorageService>(),
+      log: getIt<LoggerService>(),
+    ),
+  );
 
   // ==========================================
-  // 5. Async Initialization (order matters)
+  // 5. Async initialization (order matters)
   // ==========================================
   await getIt<DbService>().init();
   await getIt<StorageService>().init();
