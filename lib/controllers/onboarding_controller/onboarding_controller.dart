@@ -87,11 +87,16 @@ class OnboardingController extends GetxController {
   }
 
   // ===========================================
-  // Step 2 — business type
+  // Step 2 — business type (local only)
   // ===========================================
-  Future<void> submitBusinessType(String type) async {
+  // The session doesn't exist on the backend yet at this step — POST
+  // /onboarding/profile (mints the session token) runs in step 3. So we
+  // just stash `business_type` locally here and ship it in the combined
+  // PATCH at step 5 (`submitNicheEdits`). This mirrors the website, whose
+  // BusinessTypeStep also writes to its store and lets NicheResultsStep
+  // batch `business_type + edited_niche` into one PATCH /session.
+  void submitBusinessType(String type) {
     businessType.value = type;
-    await _patch(OnboardingPatchDto(businessType: type));
     goNext(AppRoutes.onboardingBusinessType);
   }
 
@@ -174,7 +179,11 @@ class OnboardingController extends GetxController {
   }
 
   Future<void> submitNicheEdits() async {
+    // Combined PATCH: `business_type` deferred from step 2 (where the
+    // session didn't exist yet) + the niche edits made on this screen.
+    // Same payload shape as the website's NicheResultsStep.
     await _patch(OnboardingPatchDto(
+      businessType: businessType.value,
       editedNiche: EditedNicheDto(
         confirmedTopics: confirmedTopics.toList(),
         suggestedTopics: suggestedTopics.toList(),

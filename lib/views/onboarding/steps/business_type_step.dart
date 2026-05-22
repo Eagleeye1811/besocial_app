@@ -13,14 +13,54 @@ class BusinessTypeStep extends GetView<OnboardingController> {
   const BusinessTypeStep({super.key});
 
   static const List<_BusinessChoice> _choices = <_BusinessChoice>[
-    _BusinessChoice('restaurant', 'Restaurant', 'Menus, dishes, ambience'),
-    _BusinessChoice('salon', 'Salon', 'Hair, beauty, transformations'),
-    _BusinessChoice('gym', 'Gym', 'Coaches, classes, results'),
-    _BusinessChoice('cafe', 'Cafe', 'Drinks, vibe, regulars'),
-    _BusinessChoice('realestate', 'Real estate', 'Listings, walkthroughs'),
-    _BusinessChoice('clinic', 'Clinic', 'Doctors, services, trust'),
-    _BusinessChoice('clothing', 'Clothing store', 'New arrivals, lookbooks'),
-    _BusinessChoice('other', 'Something else', 'Custom workflow'),
+    _BusinessChoice(
+      'restaurant',
+      'Restaurant',
+      'Menus, dishes, ambience',
+      Icons.restaurant_menu,
+    ),
+    _BusinessChoice(
+      'salon',
+      'Salon',
+      'Hair, beauty, transformations',
+      Icons.content_cut,
+    ),
+    _BusinessChoice(
+      'gym',
+      'Gym',
+      'Coaches, classes, results',
+      Icons.fitness_center,
+    ),
+    _BusinessChoice(
+      'cafe',
+      'Cafe',
+      'Drinks, vibe, regulars',
+      Icons.local_cafe,
+    ),
+    _BusinessChoice(
+      'realestate',
+      'Real estate',
+      'Listings, walkthroughs',
+      Icons.home_work,
+    ),
+    _BusinessChoice(
+      'clinic',
+      'Clinic',
+      'Doctors, services, trust',
+      Icons.medical_services,
+    ),
+    _BusinessChoice(
+      'clothing',
+      'Clothing store',
+      'New arrivals, lookbooks',
+      Icons.checkroom,
+    ),
+    _BusinessChoice(
+      'other',
+      'Something else',
+      'Custom workflow',
+      Icons.more_horiz,
+    ),
   ];
 
   @override
@@ -35,13 +75,20 @@ class BusinessTypeStep extends GetView<OnboardingController> {
       body: Obx(() {
         final selected = controller.businessType.value;
         return Column(
-          children: _choices
-              .map((c) => _ChoiceTile(
-                    choice: c,
-                    selected: selected == c.id,
-                    onTap: () => controller.businessType.value = c.id,
-                  ))
-              .toList(),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 4),
+            for (final c in _choices)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ChoiceTile(
+                  choice: c,
+                  selected: selected == c.id,
+                  onTap: () => controller.businessType.value = c.id,
+                ),
+              ),
+            const SizedBox(height: 4),
+          ],
         );
       }),
       footer: Obx(() => FootBar(
@@ -51,8 +98,8 @@ class BusinessTypeStep extends GetView<OnboardingController> {
               loading: controller.isLoading.value,
               onPressed: controller.businessType.value == null
                   ? null
-                  : () =>
-                      controller.submitBusinessType(controller.businessType.value!),
+                  : () => controller
+                      .submitBusinessType(controller.businessType.value!),
             ),
           )),
     );
@@ -63,7 +110,8 @@ class _BusinessChoice {
   final String id;
   final String label;
   final String sub;
-  const _BusinessChoice(this.id, this.label, this.sub);
+  final IconData icon;
+  const _BusinessChoice(this.id, this.label, this.sub, this.icon);
 }
 
 class _ChoiceTile extends StatelessWidget {
@@ -79,43 +127,68 @@ class _ChoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
           decoration: BoxDecoration(
-            color: selected ? AppColors.accentSoft : AppColors.white,
+            color: AppColors.white,
             border: Border.all(
               color: selected ? AppColors.accent : AppColors.line,
               width: selected ? 1.5 : 1,
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                choice.label,
-                style: TextStyle(
-                  fontFamily: AppFonts.ui,
-                  fontFamilyFallback: AppFonts.uiFallback,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? AppColors.accentInk : AppColors.ink,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Icon(
+                    choice.icon,
+                    size: 22,
+                    color: selected ? AppColors.accent : AppColors.ink2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                choice.sub,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.ink3,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        choice.label,
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ui,
+                          fontFamilyFallback: AppFonts.uiFallback,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        choice.sub,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.ink3,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
