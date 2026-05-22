@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
-import '../../core/network/api_config.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/network/dio_unwrap.dart';
 import '../../data/models/user_model.dart';
 
 /// Auth-related backend calls.
@@ -9,6 +9,10 @@ import '../../data/models/user_model.dart';
 /// Surface mirrors the FastAPI auth router 1:1; nothing about OAuth UX
 /// (the in-app WebView, redirect interception, …) lives here. That's
 /// orchestrated by `AuthService` and `AuthController`.
+///
+/// **Error contract:** every method throws [ApiException] (never a raw
+/// [DioException]). Achieved via the shared [unwrapDio] helper so controllers
+/// can do a single `on ApiException catch` and surface a snackbar.
 abstract class AuthRepository {
   /// `POST /api/v1/auth/invite/validate` → returns the signed short-lived
   /// `invite_token` the caller hands to Google sign-in.
@@ -35,38 +39,41 @@ class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl(DioClient client) : _dio = client.dio;
 
   @override
-  Future<String> validateInvite(String code) async {
-    final response = await _dio.post<dynamic>(
-      '${ApiConfig.baseUrl}/api/v1/auth/invite/validate'.replaceFirst(
-        ApiConfig.baseUrl,
-        '',
-      ),
-      data: {'code': code},
-    );
-    // Envelope interceptor has already unwrapped `data` → `{invite_token: …}`.
-    final data = response.data as Map<String, dynamic>;
-    return data['invite_token'] as String;
+  Future<String> validateInvite(String code) {
+    return unwrapDio(() async {
+      final response = await _dio.post<dynamic>(
+        '/api/v1/auth/invite/validate',
+        data: {'code': code},
+      );
+      // Envelope interceptor has already unwrapped `data` → `{invite_token: …}`.
+      final data = response.data as Map<String, dynamic>;
+      return data['invite_token'] as String;
+    });
   }
 
   @override
   Future<String> getGoogleAuthorizeUrl({
     required String sessionId,
     String? inviteToken,
-  }) async {
-    final response = await _dio.get<dynamic>(
-      '/api/v1/auth/google',
-      queryParameters: <String, dynamic>{
-        'session_id': sessionId,
-        if (inviteToken != null) 'invite_token': inviteToken,
-      },
-    );
-    final data = response.data as Map<String, dynamic>;
-    return data['authorize_url'] as String;
+  }) {
+    return unwrapDio(() async {
+      final response = await _dio.get<dynamic>(
+        '/api/v1/auth/google',
+        queryParameters: <String, dynamic>{
+          'session_id': sessionId,
+          if (inviteToken != null) 'invite_token': inviteToken,
+        },
+      );
+      final data = response.data as Map<String, dynamic>;
+      return data['authorize_url'] as String;
+    });
   }
 
   @override
-  Future<UserModel> getCurrentUser() async {
-    final response = await _dio.get<dynamic>('/api/v1/auth/me');
-    return UserModel.fromJson(response.data as Map<String, dynamic>);
+  Future<UserModel> getCurrentUser() {
+    return unwrapDio(() async {
+      final response = await _dio.get<dynamic>('/api/v1/auth/me');
+      return UserModel.fromJson(response.data as Map<String, dynamic>);
+    });
   }
 }

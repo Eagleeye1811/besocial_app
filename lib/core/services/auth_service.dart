@@ -40,25 +40,42 @@ class AuthService {
   /// Called once from the splash screen. Reads the persisted JWT (if any)
   /// and validates it by fetching `/auth/me`; clears the token on
   /// `INVALID_TOKEN` / `USER_NOT_FOUND` so the user is bounced to welcome.
+  ///
+  /// **Never throws.** Any failure (network down, secure-storage glitch,
+  /// unexpected exception) results in `_currentUser = null` and a logged
+  /// warning, so the splash always has a routing answer.
   Future<void> bootFromStorage() async {
-    final jwt = await _secure.readJwt();
-    if (jwt == null || jwt.isEmpty) {
-      _currentUser.value = null;
-      _isReady.value = true;
-      return;
-    }
     try {
-      final user = await _repo.getCurrentUser();
-      _currentUser.value = user;
-      _log.i('AuthService boot: signed in as ${user.email}');
-    } on ApiException catch (e) {
-      if (e.code == 'INVALID_TOKEN' || e.code == 'USER_NOT_FOUND') {
-        _log.w('AuthService boot: stored JWT rejected (${e.code}); clearing');
-        await _secure.clearJwt();
+      final String? jwt = await _secure.readJwt();
+      if (jwt == null || jwt.isEmpty) {
         _currentUser.value = null;
-      } else {
-        rethrow;
+        return;
       }
+      try {
+        final user = await _repo.getCurrentUser();
+        _currentUser.value = user;
+        _log.i('AuthService boot: signed in as ${user.email}');
+      } on ApiException catch (e) {
+        // The repository unwraps Dio for us, so we receive `ApiException`
+        // directly. `INVALID_TOKEN` / `USER_NOT_FOUND` mean the stored JWT
+        // is truly dead — wipe it. Anything else (timeout, network, 5xx)
+        // is a transient blip; keep the JWT for the next launch.
+        if (e.code == 'INVALID_TOKEN' || e.code == 'USER_NOT_FOUND') {
+          _log.w(
+              'AuthService boot: stored JWT rejected (${e.code}); clearing');
+          await _secure.clearJwt();
+        } else {
+          _log.w(
+              'AuthService boot: /me failed (${e.code}); keeping JWT, routing to welcome');
+        }
+        _currentUser.value = null;
+      }
+    } catch (e, st) {
+      // Catch-all so the splash never deadlocks on us. Examples that land
+      // here: secure-storage platform exception, programmer error in the
+      // repository layer, etc.
+      _log.e('AuthService boot: unexpected failure', error: e, stackTrace: st);
+      _currentUser.value = null;
     } finally {
       _isReady.value = true;
     }

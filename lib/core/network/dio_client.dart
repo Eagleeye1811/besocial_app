@@ -152,10 +152,22 @@ class _EnvelopeInterceptor extends Interceptor {
   ) {
     final errorMap = body['error'];
     if (errorMap is Map<String, dynamic>) {
-      return ApiException.fromEnvelope(
-        ApiError.fromJson(errorMap),
-        httpStatus: httpStatus,
-      );
+      // ApiError.fromJson can throw a TypeError if the server skips
+      // `message` or `code` for some reason. Catch defensively so a
+      // malformed error envelope still becomes a usable ApiException
+      // instead of an uncaught crash deep inside the interceptor.
+      try {
+        return ApiException.fromEnvelope(
+          ApiError.fromJson(errorMap),
+          httpStatus: httpStatus,
+        );
+      } catch (_) {
+        return ApiException(
+          code: ApiException.codeBadResponse,
+          message: 'Malformed error envelope from the server.',
+          httpStatus: httpStatus,
+        );
+      }
     }
     return ApiException(
       code: ApiException.codeBadResponse,

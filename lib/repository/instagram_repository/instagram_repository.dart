@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../core/network/dio_client.dart';
+import '../../core/network/dio_unwrap.dart';
 import '../../data/models/instagram_status_model.dart';
 
 /// Result of `POST /api/v1/instagram/post/{job_id}` — minimal shape, used by
@@ -18,6 +19,9 @@ class InstagramPostResult {
 }
 
 /// Instagram integration surface — auth URL, status, and post.
+///
+/// Every method routes through [unwrapDio] so callers only ever see
+/// [ApiException].
 abstract class InstagramRepository {
   /// `GET /api/v1/instagram/auth-url` — returns the URL to load in the
   /// in-app WebView. Side-effect: the backend wipes any prior IG creds
@@ -37,28 +41,34 @@ class InstagramRepositoryImpl implements InstagramRepository {
   InstagramRepositoryImpl(DioClient client) : _dio = client.dio;
 
   @override
-  Future<String> getAuthUrl() async {
-    final response = await _dio.get<dynamic>('/api/v1/instagram/auth-url');
-    return (response.data as Map<String, dynamic>)['auth_url'] as String;
+  Future<String> getAuthUrl() {
+    return unwrapDio(() async {
+      final response = await _dio.get<dynamic>('/api/v1/instagram/auth-url');
+      return (response.data as Map<String, dynamic>)['auth_url'] as String;
+    });
   }
 
   @override
-  Future<InstagramStatusModel> getStatus() async {
-    final response = await _dio.get<dynamic>('/api/v1/instagram/status');
-    return InstagramStatusModel.fromJson(
-      response.data as Map<String, dynamic>,
-    );
+  Future<InstagramStatusModel> getStatus() {
+    return unwrapDio(() async {
+      final response = await _dio.get<dynamic>('/api/v1/instagram/status');
+      return InstagramStatusModel.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    });
   }
 
   @override
-  Future<InstagramPostResult> postToInstagram(String jobId) async {
-    final response =
-        await _dio.post<dynamic>('/api/v1/instagram/post/$jobId');
-    final data = response.data as Map<String, dynamic>;
-    return InstagramPostResult(
-      igPostId: data['ig_post_id'] as String,
-      permalink: data['permalink'] as String?,
-      slideCount: data['slide_count'] as int,
-    );
+  Future<InstagramPostResult> postToInstagram(String jobId) {
+    return unwrapDio(() async {
+      final response =
+          await _dio.post<dynamic>('/api/v1/instagram/post/$jobId');
+      final data = response.data as Map<String, dynamic>;
+      return InstagramPostResult(
+        igPostId: data['ig_post_id'] as String,
+        permalink: data['permalink'] as String?,
+        slideCount: data['slide_count'] as int,
+      );
+    });
   }
 }
