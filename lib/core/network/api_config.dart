@@ -4,11 +4,15 @@
 /// Every router there mounts under `/api/v1/...`, so `baseUrl` is the bare
 /// host and each constant includes the full `/api/v1` prefix verbatim.
 class ApiConfig {
-  // Configured via compile-time environment flags to seamlessly swap backend hosts
-  // Run with: flutter run --define=API_BASE_URL=https://staging-api.besocial.com
+  // Production host of the FastAPI backend. Confirmed via
+  // `docker-compose.yml` in the backend repo (frontend bake-in arg
+  // `VITE_API_BASE_URL: https://api.growgram.app/api/v1`) and verified
+  // live: GET /health returns the standard envelope and the cert SAN is
+  // `api.growgram.app`. Override at run time for local dev:
+  //   flutter run --dart-define=API_BASE_URL=http://<LAN-IP>:8000
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://api.besocial.rightsol.com',
+    defaultValue: 'https://api.growgram.app',
   );
 
   // ==========================================

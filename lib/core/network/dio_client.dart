@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 
 import '../services/logger_service.dart';
 import '../services/secure_storage_service.dart';
@@ -44,6 +48,21 @@ class DioClient {
         responseType: ResponseType.json,
       ),
     );
+
+    // Staging/debug bypass: a self-signed or hostname-mismatched cert on the
+    // staging API was surfacing as `CLIENT_UNKNOWN` because the TLS handshake
+    // aborts before any DioException type can be set. Off-release we accept
+    // bad certificates so the request reaches the server and any real error
+    // can be mapped properly. Release builds keep strict validation.
+    if (!kReleaseMode) {
+      dio.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () {
+          final client = HttpClient();
+          client.badCertificateCallback = (cert, host, port) => true;
+          return client;
+        },
+      );
+    }
 
     dio.interceptors.addAll(<Interceptor>[
       _AuthHeaderInterceptor(secureStorage),
