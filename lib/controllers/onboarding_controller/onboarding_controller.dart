@@ -14,13 +14,21 @@ import '../../data/models/analysis_data_model.dart';
 import '../../data/models/generation_job_model.dart';
 import '../../data/models/niche_data_model.dart';
 import '../../data/models/post_data_model.dart';
-import '../../data/models/session_model.dart';
 import '../../data/models/trending_post_model.dart';
 import '../../repository/generation_repository/generation_repository.dart';
 import '../../repository/onboarding_repository/onboarding_repository.dart';
 import '../../repository/session_repository/session_repository.dart';
 import '../../views/onboarding/onboarding_steps_config.dart';
 import '../auth_controller/auth_controller.dart';
+
+/// 4-state machine for the IG profile lookup on BrandDetailsStep. Mirrors
+/// `fetchState` in `BrandDetailsStep.jsx`.
+enum ProfileFetchState { idle, fetching, fetched, error }
+
+/// Mirrors `analyzeStatus` in the web Zustand store. Drives AnalyzingNicheStep:
+/// `idle → running → (done | error)`. The `done` state allows a back-nav re-mount
+/// to forward without re-firing the 30–50s call.
+enum AnalyzeStatus { idle, running, done, error }
 
 /// Single source of truth for the onboarding wizard state. Lives as a
 /// permanent GetX dep so all 12 step views see the same instance; the
@@ -101,30 +109,89 @@ class OnboardingController extends GetxController {
   }
 
   // ===========================================
-  // Step 3 — brand details (mints session token via /profile)
+  // Step 3 — brand details
   // ===========================================
-  Future<void> submitBrandDetails() async {
+  // Two-action flow mirroring `BrandDetailsStep.jsx`:
+  //   1. `findProfile()` — POST /onboarding/profile to fetch the IG profile
+  //      and mint the session token. UI renders the result inline; does NOT
+  //      advance.
+  //   2. `continueToAnalysis()` — advances to the analyzing step. Only
+  //      enabled once the form is complete and a profile has been fetched.
+  // The brand name/city/description are kept client-side at this step
+  // (matches the website — they're not in the BrandDetails PATCH).
+  final Rx<ProfileFetchState> profileFetchState =
+      ProfileFetchState.idle.obs;
+  final RxnString profileFetchErrorCode = RxnString();
+  final RxnString profileFetchErrorMessage = RxnString();
+
+  Future<void> findProfile() async {
     final handle = instagramHandle.value?.trim();
-    if (handle == null || handle.isEmpty) {
-      errorMessage.value = 'Add your Instagram handle to continue.';
-      return;
-    }
-    await _run(() async {
+    if (handle == null || handle.length < 2) return;
+    if (profileFetchState.value == ProfileFetchState.fetching) return;
+
+    profileFetchState.value = ProfileFetchState.fetching;
+    profileFetchErrorCode.value = null;
+    profileFetchErrorMessage.value = null;
+    errorMessage.value = null;
+
+    try {
       final result = await _repo.createProfile(handle);
       profileData.value = result.profile;
       await _session.acceptSessionToken(result.sessionToken);
-      _log.i('Onboarding: profile created, session token persisted');
-      replaceWithNext(AppRoutes.onboardingBrandDetails);
-    });
+      profileFetchState.value = ProfileFetchState.fetched;
+      _log.i('Onboarding: profile fetched, session token persisted');
+    } on ApiException catch (e) {
+      profileFetchErrorCode.value = e.code;
+      profileFetchErrorMessage.value = resolveApiExceptionMessage(e);
+      profileFetchState.value = ProfileFetchState.error;
+      _log.w('Profile lookup failed: ${e.code} ${e.message}');
+    }
+  }
+
+  /// Call when the IG handle field changes so a stale fetch state doesn't
+  /// linger over a now-different handle.
+  void resetProfileFetch() {
+    if (profileFetchState.value == ProfileFetchState.idle) return;
+    profileData.value = null;
+    profileFetchState.value = ProfileFetchState.idle;
+    profileFetchErrorCode.value = null;
+    profileFetchErrorMessage.value = null;
+    errorMessage.value = null;
+  }
+
+  void continueToAnalysis() {
+    if (profileFetchState.value != ProfileFetchState.fetched) return;
+    // Reset the analyze guard so a fresh analyze actually fires when
+    // AnalyzingNicheStep mounts (matches the web's `setData('analyzeStatus',
+    // 'idle')` in BrandDetailsStep before navigating).
+    analyzeStatus.value = AnalyzeStatus.idle;
+    replaceWithNext(AppRoutes.onboardingBrandDetails);
   }
 
   // ===========================================
-  // Step 4 — analyzing niche (triggers /analyze, polls /session)
+  // Step 4 — analyzing niche
   // ===========================================
-  PollerCancel? _analyzeCancel;
+  // Direct port of the web's AnalyzingNicheStep effect — POST /analyze is
+  // synchronous server-side (no polling); we set status to `running`
+  // before the await for re-entry dedup, then store niche/analysis/posts
+  // and forward. The `done` branch lets a back-nav re-mount forward
+  // without re-firing the 30–50s call. The `error` branch blocks until
+  // BrandDetailsStep's continueToAnalysis resets to `idle`.
+  final Rx<AnalyzeStatus> analyzeStatus = AnalyzeStatus.idle.obs;
 
   Future<void> beginAnalysis() async {
-    await _run(() async {
+    if (analyzeStatus.value == AnalyzeStatus.done &&
+        niche.value != null &&
+        analysis.value != null) {
+      replaceWithNext(AppRoutes.onboardingAnalyzingNiche);
+      return;
+    }
+    if (analyzeStatus.value != AnalyzeStatus.idle) return;
+
+    analyzeStatus.value = AnalyzeStatus.running;
+    errorMessage.value = null;
+
+    try {
       final result = await _repo.analyze();
       niche.value = result.niche;
       analysis.value = result.analysis;
@@ -133,27 +200,20 @@ class OnboardingController extends GetxController {
       suggestedTopics.assignAll(result.niche.suggestedTopics);
       confirmedHashtags.assignAll(result.niche.confirmedHashtags);
       suggestedHashtags.assignAll(result.niche.suggestedHashtags);
-
-      _analyzeCancel = PollerCancel();
-      final status = await Poller.until<SessionStatusModel>(
-        fetch: _repo.getSessionStatus,
-        isTerminal: (s) => s.isTerminal,
-        initialDelay: const Duration(seconds: 5),
-        maxDelay: const Duration(seconds: 12),
-        timeout: const Duration(minutes: 8),
-        cancel: _analyzeCancel,
-      );
-      if (status.status == SessionStatus.failed) {
-        throw const ApiException(
-          code: 'INTERNAL_ERROR',
-          message: 'Analysis failed. Please retry.',
-        );
-      }
+      analyzeStatus.value = AnalyzeStatus.done;
       replaceWithNext(AppRoutes.onboardingAnalyzingNiche);
-    });
+    } on ApiException catch (e) {
+      analyzeStatus.value = AnalyzeStatus.error;
+      errorMessage.value = resolveApiExceptionMessage(e);
+      _log.w('Analysis failed: ${e.code} ${e.message}');
+    }
   }
 
-  void cancelAnalysis() => _analyzeCancel?.cancel();
+  /// No-op kept for the view's dispose hook — the synchronous /analyze call
+  /// has no cancel handle, so there's nothing to stop client-side. Bailing
+  /// from this screen mid-flight just lets the request complete in the
+  /// background; the `done` guard will fast-forward on next mount.
+  void cancelAnalysis() {}
 
   // ===========================================
   // Step 5 — niche results
@@ -204,10 +264,40 @@ class OnboardingController extends GetxController {
   // ===========================================
   // Step 8 — detected style branch
   // ===========================================
-  void chooseDetectedStyleBranch({required bool matchSpecificPost}) {
-    if (matchSpecificPost) {
-      goNext(AppRoutes.onboardingDetectedStyle);
-    } else {
+  // `styleChoice` holds the two-way branch the user picked on
+  // DetectedStyleStep: 'pick' (use one of their existing posts as visual
+  // reference) or 'custom' (go to StyleSelectionStep). Mirrors the web's
+  // `styleChoice` store slice — the user toggles a card, then Continues.
+  final RxnString styleChoice = RxnString();
+
+  /// Tap on one of the user's posts in DetectedStyleStep's "Match a specific
+  /// post" branch. PATCHes `picked_post_id` immediately so a later back-nav
+  /// preserves the selection server-side. Reverts the local pick on failure
+  /// so the UI never shows a selection the server doesn't know about.
+  Future<void> pickReferencePost(String postId) async {
+    final previous = pickedPostId.value;
+    pickedPostId.value = postId;
+    styleChoice.value = 'pick';
+    try {
+      await _repo.patchSession(
+        OnboardingPatchDto(pickedPostId: postId),
+      );
+    } on ApiException catch (e) {
+      pickedPostId.value = previous;
+      errorMessage.value = resolveApiExceptionMessage(e);
+      _log.w('Pick reference post failed: ${e.code} ${e.message}');
+    }
+  }
+
+  /// Continue button on DetectedStyleStep. Pick branch skips StyleSelection
+  /// (the post replaces the aesthetic grid) but STILL collects colors+voice
+  /// — personalization is required regardless of how visual was chosen.
+  /// Custom branch routes through StyleSelection.
+  void continueFromDetectedStyle() {
+    final choice = styleChoice.value;
+    if (choice == 'pick' && pickedPostId.value != null) {
+      Get.toNamed<void>(AppRoutes.onboardingColorsVoice);
+    } else if (choice == 'custom') {
       Get.toNamed<void>(AppRoutes.onboardingStyleSelection);
     }
   }

@@ -88,7 +88,18 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   @override
   Future<AnalyzeResult> analyze() {
     return unwrapDio(() async {
-      final response = await _dio.post<dynamic>('/api/v1/onboarding/analyze');
+      // /onboarding/analyze is synchronous server-side and budgets 30–50s
+      // wall-clock (Apify post fetch + Grok niche inference). The DioClient
+      // BaseOptions cap at 30s, so we override per-request to 90s — Dio
+      // honors per-request `Options.receiveTimeout`/`sendTimeout` over the
+      // base values and never clamps them, so no client-wide change needed.
+      final response = await _dio.post<dynamic>(
+        '/api/v1/onboarding/analyze',
+        options: Options(
+          sendTimeout: const Duration(seconds: 90),
+          receiveTimeout: const Duration(seconds: 90),
+        ),
+      );
       final data = response.data as Map<String, dynamic>;
       return AnalyzeResult(
         niche: NicheDataModel.fromJson(data['niche'] as Map<String, dynamic>),
