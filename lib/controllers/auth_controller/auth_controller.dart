@@ -1,10 +1,6 @@
-import 'dart:async';
-
-import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/error_messages.dart';
 import '../../core/network/api_exception.dart';
@@ -75,28 +71,23 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Open Google OAuth in the device's default browser (external app).
+  /// Open Google OAuth inside the in-app WebView ([OAuthWebViewView]).
   ///
-  /// Google blocks OAuth in embedded WebViews under its "secure browser
-  /// policy" — `disallowed_useragent` errors and `403 Access blocked: This
-  /// app's request is invalid`. The fix is to use the system browser
-  /// (Chrome / Safari) via `url_launcher` with `LaunchMode.externalApplication`.
-  ///
-  /// Callback handling: the backend redirects to
-  ///   `FRONTEND_URL/auth/callback#token=<jwt>[&new_user=1]`
-  /// or `FRONTEND_URL/auth/callback?error=<code>` on failure. For the
-  /// callback to land back inside the app, the device must treat that URL
-  /// as an app/universal link (`app_links` picks up the URI on Android via
-  /// the manifest intent-filter and on iOS via associated domains). If the
-  /// native link config isn't wired yet, the callback opens in the browser
-  /// instead — the app times out after 5 minutes and the user re-tries.
+  /// The WebView is configured with a Chrome desktop User-Agent so Google
+  /// doesn't reject the request with `disallowed_useragent` (Google's
+  /// "secure browser policy" detects the default Android WebView UA which
+  /// contains the `; wv)` marker). The WebView's navigation delegate
+  /// intercepts the backend redirect to `…/auth/callback#token=<jwt>` and
+  /// pops the route with a typed [OAuthResult] — the user never leaves
+  /// the app.
   ///
   /// - Welcome's "Sign in with Google" link calls this with no [inviteToken]
   ///   (returning user) and no override on [destinationRoute] — lands at
   ///   `/home`.
   /// - The inspiration step's first-heart handoff calls this with the
   ///   stored invite token (new-user signup) and `destinationRoute =
-  ///   AppRoutes.onboardingGenerating` so the wizard resumes JWT-gated.
+  ///   AppRoutes.onboardingGenerating` so the wizard resumes JWT-gated
+  ///   and the generation step auto-fires `POST /generation`.
   Future<void> signInWithGoogle({
     String? inviteToken,
     String destinationRoute = AppRoutes.home,
@@ -112,10 +103,17 @@ class AuthController extends GetxController {
         inviteToken: inviteToken,
       );
 
-      // Listen on the OS link channel *before* we launch the browser, so
-      // we don't miss a fast callback. `app_links` emits URIs delivered to
-      // the app via intent (Android) or NSUserActivity (iOS).
-      final result = await _launchAndAwaitCallback(authorizeUrl);
+      // NOTE: do NOT parameterise `Get.toNamed` with `<OAuthResult>`. GetX's
+      // routing layer wraps the navigation result in a `Route<dynamic>` and
+      // attempts an unchecked cast to `Route<T>` when a generic is supplied —
+      // that throws `_TypeError: type 'GetPageRoute<dynamic>' is not a subtype
+      // of type 'Route<OAuthResult?>'` at runtime. Take the dynamic payload
+      // back and let Dart's pattern matching narrow it on real subtype.
+      final dynamic raw = await Get.toNamed(
+        AppRoutes.oauthWebview,
+        arguments: authorizeUrl,
+      );
+      final OAuthResult? result = raw is OAuthResult ? raw : null;
 
       switch (result) {
         case OAuthSuccess():
@@ -129,77 +127,17 @@ class AuthController extends GetxController {
           // Should not be reachable from the Google OAuth URL.
           errorMessage.value = 'Unexpected Instagram callback during sign-in.';
           _log.w('signInWithGoogle received InstagramConnectSuccess');
+        case null:
+          // User dismissed the WebView with the system back gesture before
+          // either branch fired (the view's PopScope normally maps this
+          // to clientCancelled, but be defensive about a null pop too).
+          return;
       }
     } on ApiException catch (e) {
       errorMessage.value = resolveApiExceptionMessage(e);
     } finally {
       isStartingGoogleSignIn.value = false;
     }
-  }
-
-  /// Launch [authorizeUrl] in the system browser and await the OAuth
-  /// callback URI that lands back in the app via `app_links`. Returns
-  /// [OAuthError.clientCancelled] if the launch fails or the callback
-  /// never arrives within the 5-minute budget.
-  Future<OAuthResult> _launchAndAwaitCallback(String authorizeUrl) async {
-    final appLinks = AppLinks();
-    final completer = Completer<OAuthResult>();
-    StreamSubscription<Uri>? sub;
-    Timer? timeout;
-
-    void finish(OAuthResult result) {
-      if (completer.isCompleted) return;
-      completer.complete(result);
-      sub?.cancel();
-      timeout?.cancel();
-    }
-
-    sub = appLinks.uriLinkStream.listen(
-      (uri) {
-        _log.i('OAuth callback uri received: ${uri.toString()}');
-        if (!_isCallbackUri(uri)) return;
-        finish(_parseCallback(uri));
-      },
-      onError: (Object e, StackTrace st) {
-        _log.w('app_links stream error: $e');
-      },
-    );
-
-    timeout = Timer(const Duration(minutes: 5), () {
-      _log.w('OAuth callback timed out after 5 minutes');
-      finish(const OAuthError(OAuthError.clientCancelled));
-    });
-
-    final launched = await launchUrl(
-      Uri.parse(authorizeUrl),
-      mode: LaunchMode.externalApplication,
-    );
-    if (!launched) {
-      finish(const OAuthError(OAuthError.clientCancelled));
-      _log.w('launchUrl returned false for $authorizeUrl');
-    }
-
-    return completer.future;
-  }
-
-  bool _isCallbackUri(Uri uri) =>
-      uri.path.endsWith('/auth/callback') ||
-      uri.path.endsWith('/onboarding/instagram-connect');
-
-  OAuthResult _parseCallback(Uri uri) {
-    final error = uri.queryParameters['error'];
-    if (error != null) return OAuthError(error);
-
-    final fragmentParams = uri.fragment.isEmpty
-        ? const <String, String>{}
-        : Uri.splitQueryString(uri.fragment);
-    final token = fragmentParams['token'];
-    final newUserFlag = fragmentParams['new_user'];
-
-    if (token == null || token.isEmpty) {
-      return const OAuthError(OAuthError.clientMissingToken);
-    }
-    return OAuthSuccess(token: token, isNewUser: newUserFlag == '1');
   }
 
   String _oauthErrorCopy(String reason) {

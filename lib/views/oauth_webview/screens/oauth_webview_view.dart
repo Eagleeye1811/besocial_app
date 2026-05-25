@@ -23,6 +23,14 @@ class OAuthWebViewView extends StatefulWidget {
   State<OAuthWebViewView> createState() => _OAuthWebViewViewState();
 }
 
+/// Chrome-on-Android User-Agent string. Google's OAuth endpoint blocks the
+/// default Flutter WebView UA (which contains the `; wv)` marker); presenting
+/// a standard Chrome UA bypasses the `disallowed_useragent` rejection.
+const String _chromeUserAgent =
+    'Mozilla/5.0 (Linux; Android 13; Pixel 7) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) '
+    'Chrome/121.0.0.0 Mobile Safari/537.36';
+
 class _OAuthWebViewViewState extends State<OAuthWebViewView> {
   late final WebViewController _controller;
   bool _resultDispatched = false;
@@ -36,6 +44,11 @@ class _OAuthWebViewViewState extends State<OAuthWebViewView> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(AppColors.surface)
+      // Google's OAuth "secure browser policy" rejects requests whose
+      // User-Agent contains the Android WebView marker `; wv)` with
+      // `403: disallowed_useragent`. Setting a real Chrome UA bypasses
+      // the heuristic so the consent screen renders normally.
+      ..setUserAgent(_chromeUserAgent)
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (p) => setState(() => _loadingPercent = p),
