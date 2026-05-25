@@ -27,6 +27,40 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!--
+                Android App Links — claim the backend's OAuth callback URL so
+                the Google sign-in flow returns to the app instead of the
+                browser. Backend redirects to `https://growgram.app/auth/callback`
+                (Google) and `https://growgram.app/onboarding/instagram-connect`
+                (Instagram).
+
+                For Android to skip the "Open with…" picker and auto-launch the
+                app, deploy `/.well-known/assetlinks.json` on growgram.app with
+                the app's SHA-256 cert fingerprint. Until that's deployed the
+                user will see a chooser the first time and can pick the app.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="growgram.app" />
+                <data android:pathPrefix="/auth/callback" />
+                <data android:pathPrefix="/onboarding/instagram-connect" />
+            </intent-filter>
+
+            <!--
+                Fallback custom scheme — if the backend ever ships a build that
+                redirects to `besocialapp://auth/callback#token=…` (no
+                assetlinks.json hosting needed), this filter catches it.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="besocialapp" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

@@ -45,5 +45,27 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!--
+		Custom URL scheme — fallback for OAuth callback. Backend can be
+		configured to redirect to besocialapp://auth/callback#token=…
+		when the public domain's universal-links aren't claimed yet.
+		For HTTPS Universal Links (preferred), add the Associated Domains
+		capability in Xcode (target → Signing & Capabilities → +
+		Associated Domains → applinks:growgram.app) AND host
+		/.well-known/apple-app-site-association on growgram.app.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>app.growgram.besocial</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>besocialapp</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

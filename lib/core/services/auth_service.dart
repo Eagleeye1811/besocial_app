@@ -48,6 +48,10 @@ class AuthService {
     try {
       final String? jwt = await _secure.readJwt();
       if (jwt == null || jwt.isEmpty) {
+        // No JWT → the user will land on welcome → start a new onboarding
+        // run. Drop any stale session pair so a previously-promoted
+        // session_id isn't reused (would trip MISSING_AUTH on /analyze).
+        await _session.clear();
         _currentUser.value = null;
         return;
       }
@@ -58,12 +62,14 @@ class AuthService {
       } on ApiException catch (e) {
         // The repository unwraps Dio for us, so we receive `ApiException`
         // directly. `INVALID_TOKEN` / `USER_NOT_FOUND` mean the stored JWT
-        // is truly dead — wipe it. Anything else (timeout, network, 5xx)
-        // is a transient blip; keep the JWT for the next launch.
+        // is truly dead — wipe it AND the session pair (which belongs to
+        // a now-orphaned user record). Anything else (timeout, network,
+        // 5xx) is a transient blip; keep both for the next launch.
         if (e.code == 'INVALID_TOKEN' || e.code == 'USER_NOT_FOUND') {
           _log.w(
               'AuthService boot: stored JWT rejected (${e.code}); clearing');
           await _secure.clearJwt();
+          await _session.clear();
         } else {
           _log.w(
               'AuthService boot: /me failed (${e.code}); keeping JWT, routing to welcome');

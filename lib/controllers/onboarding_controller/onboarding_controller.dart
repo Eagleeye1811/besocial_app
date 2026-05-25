@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
 
@@ -9,11 +10,13 @@ import '../../core/routes/app_routes.dart';
 import '../../core/services/logger_service.dart';
 import '../../core/services/polling_service.dart';
 import '../../core/services/secure_storage_service.dart';
+import '../../core/services/auth_service.dart';
 import '../../data/dto/onboarding_dto.dart';
 import '../../data/models/analysis_data_model.dart';
 import '../../data/models/generation_job_model.dart';
 import '../../data/models/niche_data_model.dart';
 import '../../data/models/post_data_model.dart';
+import '../../data/models/session_model.dart';
 import '../../data/models/trending_post_model.dart';
 import '../../repository/generation_repository/generation_repository.dart';
 import '../../repository/onboarding_repository/onboarding_repository.dart';
@@ -364,6 +367,14 @@ class OnboardingController extends GetxController {
   }
 
   // ===========================================
+  // Pipeline poll (used by FetchingPostsStep) — wraps /session
+  // ===========================================
+  /// One-shot read of the onboarding pipeline status. Mirrors the web's
+  /// `getSession()` call inside `FetchingPostsStep.jsx`. The widget polls
+  /// this every 10s until it observes `ready` or `failed`.
+  Future<SessionStatusModel> getSessionStatus() => _repo.getSessionStatus();
+
+  // ===========================================
   // Step 13 — inspiration (swipe + Google handoff)
   // ===========================================
   Future<void> swipePost({
@@ -372,20 +383,59 @@ class OnboardingController extends GetxController {
   }) async {
     final action = shortlisted ? 'shortlisted' : 'skipped';
     try {
+      _log.i('swipePost: $action $postId');
       await _repo.swipe(postId: postId, action: action);
       if (shortlisted) {
         shortlistedPostIds.add(postId);
-        // First shortlist seeds the picked_post_id and triggers Google.
-        if (pickedPostId.value == null) {
-          pickedPostId.value = postId;
+
+        // Always update picked_post_id to the latest save and PATCH it
+        // server-side — the most recent save wins as the reference post.
+        // This matches the web's `handleSave`, which mirrors the swipe to
+        // the backend and then immediately fires the auth gate on EVERY
+        // successful save, not just the first.
+        final isNewPick = pickedPostId.value != postId;
+        pickedPostId.value = postId;
+        if (isNewPick) {
           await _patch(OnboardingPatchDto(pickedPostId: postId));
+        }
+
+        // Auth gate — same logic as the web's
+        //   if (auth.isAuthenticated()) goNext('generating');
+        //   else setShowSignupModal(true);
+        // Mobile replaces the modal with the in-app OAuth WebView and
+        // calls offAllNamed(generating) on the authenticated branch.
+        final authSvc = GetIt.I<AuthService>();
+        if (authSvc.isAuthenticated) {
+          _log.i('swipePost: authenticated — routing to onboardingGenerating');
+          Get.snackbar(
+            'Signed in',
+            "We've got your session — heading to generation.",
+            snackPosition: SnackPosition.BOTTOM,
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          );
+          Get.offAllNamed(AppRoutes.onboardingGenerating);
+        } else {
+          _log.i('swipePost: not authenticated — opening Google OAuth');
           await _triggerGoogleHandoff();
         }
       } else {
         skippedPostIds.add(postId);
       }
     } on ApiException catch (e) {
+      _log.w('swipePost failed: ${e.code} ${e.message}');
       errorMessage.value = resolveApiExceptionMessage(e);
+      // Surface the failure prominently — the inline error pill at the
+      // bottom of the inspiration grid is easy to miss.
+      Get.snackbar(
+        "Couldn't save",
+        resolveApiExceptionMessage(e),
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(16),
+        backgroundColor: const Color(0xFF18181B),
+        colorText: const Color(0xFFFFFFFF),
+        duration: const Duration(seconds: 4),
+      );
     }
   }
 
@@ -455,6 +505,23 @@ class OnboardingController extends GetxController {
   /// From the result screen, advance to the celebration screen.
   void completeOnboardingFromResult() {
     Get.offNamed<void>(AppRoutes.onboardingComplete);
+  }
+
+  /// "Generate another" on ResultStep. Mirrors the web's
+  /// `handleRegenerate`: clear the current job, push the user back to
+  /// /generating, and let that screen's `triggerGeneration` kick a fresh
+  /// `POST /generation`.
+  Future<void> regenerateFromResult() async {
+    currentJob.value = null;
+    errorMessage.value = null;
+    Get.offNamed<void>(AppRoutes.onboardingGenerating);
+  }
+
+  /// "Skip for now — go to dashboard" on ResultStep. Mirrors the web's
+  /// `navigate('/home')` skip link.
+  void skipResultToDashboard() {
+    cancelGeneration();
+    Get.offAllNamed(AppRoutes.home);
   }
 
   // ===========================================

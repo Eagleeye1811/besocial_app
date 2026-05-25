@@ -1,6 +1,10 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/error_messages.dart';
 import '../../core/network/api_exception.dart';
@@ -55,6 +59,12 @@ class AuthController extends GetxController {
     try {
       final inviteToken = await _authRepo.validateInvite(code);
       await _secure.writeInviteToken(inviteToken);
+      // Wipe any stale session pair before minting a fresh one. A leftover
+      // session_id from a previous run can already be OAuth-promoted on the
+      // backend (sessions.user_id set), which trips MISSING_AUTH on the very
+      // next pre-auth call (/profile, /analyze, …) because the backend then
+      // demands a JWT we don't yet have.
+      await _session.clear();
       await _session.ensureSessionId();
       _log.i('Invite accepted; routing into onboarding wizard');
       Get.offNamed<void>(AppRoutes.onboardingBusinessType);
@@ -65,7 +75,21 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Open Google OAuth in the in-app WebView.
+  /// Open Google OAuth in the device's default browser (external app).
+  ///
+  /// Google blocks OAuth in embedded WebViews under its "secure browser
+  /// policy" — `disallowed_useragent` errors and `403 Access blocked: This
+  /// app's request is invalid`. The fix is to use the system browser
+  /// (Chrome / Safari) via `url_launcher` with `LaunchMode.externalApplication`.
+  ///
+  /// Callback handling: the backend redirects to
+  ///   `FRONTEND_URL/auth/callback#token=<jwt>[&new_user=1]`
+  /// or `FRONTEND_URL/auth/callback?error=<code>` on failure. For the
+  /// callback to land back inside the app, the device must treat that URL
+  /// as an app/universal link (`app_links` picks up the URI on Android via
+  /// the manifest intent-filter and on iOS via associated domains). If the
+  /// native link config isn't wired yet, the callback opens in the browser
+  /// instead — the app times out after 5 minutes and the user re-tries.
   ///
   /// - Welcome's "Sign in with Google" link calls this with no [inviteToken]
   ///   (returning user) and no override on [destinationRoute] — lands at
@@ -88,15 +112,11 @@ class AuthController extends GetxController {
         inviteToken: inviteToken,
       );
 
-      final result = await Get.toNamed<dynamic>(
-        AppRoutes.oauthWebview,
-        arguments: authorizeUrl,
-      );
+      // Listen on the OS link channel *before* we launch the browser, so
+      // we don't miss a fast callback. `app_links` emits URIs delivered to
+      // the app via intent (Android) or NSUserActivity (iOS).
+      final result = await _launchAndAwaitCallback(authorizeUrl);
 
-      if (result is! OAuthResult) {
-        // User dismissed via system gesture before the WebView dispatched.
-        return;
-      }
       switch (result) {
         case OAuthSuccess():
           await _auth.acceptOAuthJwt(result.token);
@@ -106,9 +126,7 @@ class AuthController extends GetxController {
           if (result.reason == OAuthError.clientCancelled) return;
           errorMessage.value = _oauthErrorCopy(result.reason);
         case InstagramConnectSuccess():
-          // Should not be reachable from the Google OAuth URL — the
-          // WebView only emits this variant for the IG callback path.
-          // Treat as a hard error if it ever leaks here.
+          // Should not be reachable from the Google OAuth URL.
           errorMessage.value = 'Unexpected Instagram callback during sign-in.';
           _log.w('signInWithGoogle received InstagramConnectSuccess');
       }
@@ -117,6 +135,71 @@ class AuthController extends GetxController {
     } finally {
       isStartingGoogleSignIn.value = false;
     }
+  }
+
+  /// Launch [authorizeUrl] in the system browser and await the OAuth
+  /// callback URI that lands back in the app via `app_links`. Returns
+  /// [OAuthError.clientCancelled] if the launch fails or the callback
+  /// never arrives within the 5-minute budget.
+  Future<OAuthResult> _launchAndAwaitCallback(String authorizeUrl) async {
+    final appLinks = AppLinks();
+    final completer = Completer<OAuthResult>();
+    StreamSubscription<Uri>? sub;
+    Timer? timeout;
+
+    void finish(OAuthResult result) {
+      if (completer.isCompleted) return;
+      completer.complete(result);
+      sub?.cancel();
+      timeout?.cancel();
+    }
+
+    sub = appLinks.uriLinkStream.listen(
+      (uri) {
+        _log.i('OAuth callback uri received: ${uri.toString()}');
+        if (!_isCallbackUri(uri)) return;
+        finish(_parseCallback(uri));
+      },
+      onError: (Object e, StackTrace st) {
+        _log.w('app_links stream error: $e');
+      },
+    );
+
+    timeout = Timer(const Duration(minutes: 5), () {
+      _log.w('OAuth callback timed out after 5 minutes');
+      finish(const OAuthError(OAuthError.clientCancelled));
+    });
+
+    final launched = await launchUrl(
+      Uri.parse(authorizeUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched) {
+      finish(const OAuthError(OAuthError.clientCancelled));
+      _log.w('launchUrl returned false for $authorizeUrl');
+    }
+
+    return completer.future;
+  }
+
+  bool _isCallbackUri(Uri uri) =>
+      uri.path.endsWith('/auth/callback') ||
+      uri.path.endsWith('/onboarding/instagram-connect');
+
+  OAuthResult _parseCallback(Uri uri) {
+    final error = uri.queryParameters['error'];
+    if (error != null) return OAuthError(error);
+
+    final fragmentParams = uri.fragment.isEmpty
+        ? const <String, String>{}
+        : Uri.splitQueryString(uri.fragment);
+    final token = fragmentParams['token'];
+    final newUserFlag = fragmentParams['new_user'];
+
+    if (token == null || token.isEmpty) {
+      return const OAuthError(OAuthError.clientMissingToken);
+    }
+    return OAuthSuccess(token: token, isNewUser: newUserFlag == '1');
   }
 
   String _oauthErrorCopy(String reason) {
