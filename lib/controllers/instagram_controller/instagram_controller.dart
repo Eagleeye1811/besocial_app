@@ -35,6 +35,16 @@ class InstagramController extends GetxController {
     refreshStatus();
   }
 
+  /// Clear all connection state. Called on logout — this controller is
+  /// `permanent`, so it survives `Get.offAllNamed` and would otherwise leak
+  /// the previous account's Instagram status into the next session.
+  void reset() {
+    status.value = null;
+    isLoading.value = false;
+    isConnecting.value = false;
+    errorMessage.value = null;
+  }
+
   Future<void> refreshStatus() async {
     isLoading.value = true;
     errorMessage.value = null;

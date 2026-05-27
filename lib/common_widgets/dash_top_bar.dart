@@ -44,6 +44,12 @@ class DashTopBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         IconButton(
+          icon: const Icon(Icons.palette_outlined),
+          color: AppColors.ink2,
+          tooltip: 'Brand',
+          onPressed: () => Get.toNamed<void>(AppRoutes.brand),
+        ),
+        IconButton(
           icon: const Icon(Icons.settings_outlined),
           color: AppColors.ink2,
           tooltip: 'Settings',

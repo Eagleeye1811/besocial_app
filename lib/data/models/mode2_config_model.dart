@@ -25,8 +25,12 @@ enum Mode2StyleSource {
 }
 
 /// Body for `PATCH /api/v1/dashboard/shortlist/{post_id}/config` and result of
-/// the matching GET. Backend declares `extra="forbid"` — keep this model lean.
-@JsonSerializable(fieldRename: FieldRename.snake, includeIfNull: false)
+/// the matching GET. The PATCH is a wholesale replace, so we serialize every
+/// field (including explicit `null`s) — matching the web `buildPayload`, which
+/// always sends `palette_override` / `tone_override` / `match_style_post_id` /
+/// `asset_id` / `edited_slide_texts` even when null. All keys are declared on
+/// the backend's `Mode2ConfigPatchRequest`, so `extra="forbid"` is satisfied.
+@JsonSerializable(fieldRename: FieldRename.snake)
 class Mode2ConfigModel {
   final Mode2StyleSource styleSource;
   final String? paletteOverride;

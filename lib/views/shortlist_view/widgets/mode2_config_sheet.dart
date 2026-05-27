@@ -184,7 +184,12 @@ class _Mode2ConfigSheetState extends State<Mode2ConfigSheet> {
           newTexts.isNotEmpty &&
           !_hasUserEditedSlides) {
         for (var i = 0; i < newTexts.length && i < _slideCount; i++) {
-          _slideControllers[i].text = newTexts[i];
+          // Set value with the caret parked at the end so a background
+          // re-seed never yanks the cursor mid-edit.
+          _slideControllers[i].value = TextEditingValue(
+            text: newTexts[i],
+            selection: TextSelection.collapsed(offset: newTexts[i].length),
+          );
         }
       }
     });
@@ -381,6 +386,7 @@ class _Mode2ConfigSheetState extends State<Mode2ConfigSheet> {
   }
 
   Widget _assetSection(BuildContext context) {
+    final attached = _assetId != null;
     return Opacity(
       opacity: _replicateMode ? 0.55 : 1,
       child: Column(
@@ -392,63 +398,85 @@ class _Mode2ConfigSheetState extends State<Mode2ConfigSheet> {
                 _replicateMode ? 'disabled in replicate mode' : 'optional',
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              if (_assetId != null)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentSoft,
-                    border: Border.all(color: AppColors.accent),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.check,
-                          size: 13, color: AppColors.accentInk),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Asset attached',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.accentInk,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Text(
-                  'No asset attached',
-                  style: TextStyle(fontSize: 12, color: AppColors.ink3),
+          InkWell(
+            onTap: _replicateMode
+                ? null
+                : () async {
+                    final picked = await AssetPickerSheet.show(
+                      context,
+                      initialSelectedId: _assetId,
+                    );
+                    if (picked != null && mounted) {
+                      setState(() => _assetId = picked);
+                    }
+                  },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: attached ? AppColors.accentSoft : AppColors.white,
+                border: Border.all(
+                  color: attached ? AppColors.accent : AppColors.line,
                 ),
-              const SizedBox(width: 10),
-              TextButton(
-                onPressed: _replicateMode
-                    ? null
-                    : () async {
-                        final picked = await AssetPickerSheet.show(
-                          context,
-                          initialSelectedId: _assetId,
-                        );
-                        if (picked != null && mounted) {
-                          setState(() => _assetId = picked);
-                        }
-                      },
-                child: Text(_assetId != null ? 'Change' : 'Pick an asset'),
+                borderRadius: BorderRadius.circular(12),
               ),
-              if (_assetId != null && !_replicateMode)
-                TextButton(
-                  onPressed: () => setState(() => _assetId = null),
-                  child: Text(
-                    'Remove',
-                    style: TextStyle(color: AppColors.ink3),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: attached ? AppColors.white : AppColors.surface2,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      attached
+                          ? Icons.check_rounded
+                          : Icons.add_photo_alternate_outlined,
+                      size: 20,
+                      color: attached ? AppColors.accent : AppColors.ink3,
+                    ),
                   ),
-                ),
-            ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          attached ? 'Asset attached' : 'Pick an asset',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: attached ? AppColors.accentInk : AppColors.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          attached
+                              ? 'Tap to choose a different one'
+                              : 'A logo, product, or photo to feature',
+                          style:
+                              TextStyle(fontSize: 11.5, color: AppColors.ink3),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (attached && !_replicateMode)
+                    IconButton(
+                      onPressed: () => setState(() => _assetId = null),
+                      icon: const Icon(Icons.close, size: 18),
+                      color: AppColors.ink3,
+                      tooltip: 'Remove asset',
+                      visualDensity: VisualDensity.compact,
+                    )
+                  else
+                    const Icon(Icons.chevron_right,
+                        size: 20, color: AppColors.ink3),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -530,6 +558,12 @@ class _Mode2ConfigSheetState extends State<Mode2ConfigSheet> {
                 Expanded(
                   child: TextField(
                     controller: _slideControllers[i],
+                    // Force LTR base direction + left alignment. Captions that
+                    // start with emoji/symbols (e.g. "✨…") otherwise make the
+                    // field auto-detect RTL, which puts the caret on the wrong
+                    // side and inserts new text to the left of the cursor.
+                    textDirection: TextDirection.ltr,
+                    textAlign: TextAlign.left,
                     onChanged: (_) {
                       if (!_hasUserEditedSlides) {
                         setState(() => _hasUserEditedSlides = true);

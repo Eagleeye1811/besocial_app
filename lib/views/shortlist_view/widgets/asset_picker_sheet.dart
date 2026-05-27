@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../common_widgets/app_snackbar.dart';
 import '../../../core/constants/error_messages.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/network/api_exception.dart';
@@ -13,9 +17,9 @@ import '../../../repository/brand_repository/brand_repository.dart';
 ///
 /// Type chips switch the listed category (face / product / logo / background /
 /// custom); tapping a tile selects it; "Use this asset" returns the chosen
-/// `asset_id`. Upload is intentionally omitted on mobile (deferred — image
-/// picker not yet wired in this surface); the web modal's upload tile has no
-/// mobile counterpart here.
+/// `asset_id`. Each category also offers an inline "Add" tile so the user can
+/// upload a new asset (from gallery or camera) for that type when none exist
+/// yet — the new asset is selected automatically.
 class AssetPickerSheet extends StatefulWidget {
   final String? initialSelectedId;
 
@@ -44,6 +48,8 @@ class AssetPickerSheet extends StatefulWidget {
 
 class _AssetPickerSheetState extends State<AssetPickerSheet> {
   final BrandRepository _brand = GetIt.I<BrandRepository>();
+  final ImagePicker _picker = ImagePicker();
+  bool _uploading = false;
 
   // Same id namespace as the web ASSET_TYPES list.
   static const List<BrandAssetType> _types = <BrandAssetType>[
@@ -86,6 +92,72 @@ class _AssetPickerSheetState extends State<AssetPickerSheet> {
         _loading = false;
       });
     }
+  }
+
+  /// Pick an image (gallery or camera) and upload it as the active type,
+  /// then refresh the list and auto-select the new asset.
+  Future<void> _addAsset() async {
+    if (_uploading) return;
+    final source = await _chooseSource();
+    if (source == null) return;
+
+    final XFile? picked =
+        await _picker.pickImage(source: source, imageQuality: 90);
+    if (picked == null) return;
+
+    setState(() => _uploading = true);
+    try {
+      final created = await _brand.uploadAsset(
+        type: _activeType,
+        label: '${_typeLabel(_activeType)} ${_assets.length + 1}',
+        file: File(picked.path),
+      );
+      if (!mounted) return;
+      // Refetch so the new asset shows in the backend's canonical order.
+      await _load();
+      if (!mounted) return;
+      setState(() => _selectedId = created.assetId);
+      AppSnackbar.success(
+        'Asset added',
+        '${_typeLabel(_activeType)} uploaded and selected.',
+      );
+    } on ApiException catch (e) {
+      AppSnackbar.error('Upload failed', resolveApiExceptionMessage(e));
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<ImageSource?> _chooseSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 6),
+            ListTile(
+              leading:
+                  const Icon(Icons.photo_library_outlined, color: AppColors.ink2),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.camera_alt_outlined, color: AppColors.ink2),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+    );
   }
 
   String _typeLabel(BrandAssetType t) {
@@ -139,7 +211,7 @@ class _AssetPickerSheetState extends State<AssetPickerSheet> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Choose an existing asset to attach.',
+                  'Choose an asset, or add a new one.',
                   style: TextStyle(fontSize: 12.5, color: AppColors.ink3),
                 ),
               ],
@@ -215,18 +287,8 @@ class _AssetPickerSheetState extends State<AssetPickerSheet> {
         ),
       );
     }
-    if (_assets.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: Text(
-            'No ${_typeLabel(_activeType).toLowerCase()} assets yet.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppColors.ink3),
-          ),
-        ),
-      );
-    }
+    // Grid always leads with an "Add {type}" tile so the user can upload a
+    // new asset for the active category — even when none exist yet.
     return GridView.builder(
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -236,9 +298,16 @@ class _AssetPickerSheetState extends State<AssetPickerSheet> {
         mainAxisSpacing: 10,
         childAspectRatio: 0.82,
       ),
-      itemCount: _assets.length,
+      itemCount: _assets.length + 1,
       itemBuilder: (_, i) {
-        final asset = _assets[i];
+        if (i == 0) {
+          return _AddTile(
+            label: 'Add ${_typeLabel(_activeType).toLowerCase()}',
+            uploading: _uploading,
+            onTap: _addAsset,
+          );
+        }
+        final asset = _assets[i - 1];
         return _AssetTile(
           asset: asset,
           selected: _selectedId == asset.assetId,
@@ -247,6 +316,113 @@ class _AssetPickerSheetState extends State<AssetPickerSheet> {
       },
     );
   }
+}
+
+/// Dashed "+" tile that uploads a new asset for the active type.
+class _AddTile extends StatelessWidget {
+  final String label;
+  final bool uploading;
+  final VoidCallback onTap;
+
+  const _AddTile({
+    required this.label,
+    required this.uploading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: uploading ? null : onTap,
+      child: DottedBorderBox(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (uploading)
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.accentSoft,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.add, size: 20, color: AppColors.accent),
+              ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Text(
+                uploading ? 'Uploading…' : label,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ink2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Rounded box with a dashed accent border — the visual cue for "add".
+class DottedBorderBox extends StatelessWidget {
+  final Widget child;
+  const DottedBorderBox({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedRectPainter(),
+      child: Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(6),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DashedRectPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.line
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(12),
+    );
+    final path = Path()..addRRect(rrect);
+    const dash = 5.0;
+    const gap = 4.0;
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(
+          metric.extractPath(distance, distance + dash),
+          paint,
+        );
+        distance += dash + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _AssetTile extends StatelessWidget {

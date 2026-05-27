@@ -677,7 +677,7 @@ class _ActionMenu extends StatelessWidget {
       },
       itemBuilder: (_) => const [
         PopupMenuItem(
-            value: _CardAction.configure, child: Text('Configure style')),
+            value: _CardAction.configure, child: Text('Customize this post')),
         PopupMenuItem(
             value: _CardAction.remove, child: Text('Remove from shortlist')),
       ],

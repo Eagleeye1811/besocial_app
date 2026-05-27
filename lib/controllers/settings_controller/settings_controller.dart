@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/auth_service.dart';
 import '../../data/models/user_model.dart';
+import '../instagram_controller/instagram_controller.dart';
 
 /// Drives the Settings screen. Thin — the heavy state lives elsewhere
 /// (AuthService for the user, InstagramController for IG status). This
@@ -21,6 +22,11 @@ class SettingsController extends GetxController {
 
   Future<void> logout() async {
     await _auth.logout();
+    // The IG controller is a permanent GetX dep, so it isn't disposed by
+    // offAllNamed — clear it explicitly so the next account starts clean.
+    if (Get.isRegistered<InstagramController>()) {
+      Get.find<InstagramController>().reset();
+    }
     Get.offAllNamed(AppRoutes.welcome);
   }
 }

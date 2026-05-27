@@ -21,13 +21,11 @@ Mode2ConfigModel _$Mode2ConfigModelFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$Mode2ConfigModelToJson(Mode2ConfigModel instance) =>
     <String, dynamic>{
       'style_source': _$Mode2StyleSourceEnumMap[instance.styleSource]!,
-      if (instance.paletteOverride case final value?) 'palette_override': value,
-      if (instance.toneOverride case final value?) 'tone_override': value,
-      if (instance.matchStylePostId case final value?)
-        'match_style_post_id': value,
-      if (instance.assetId case final value?) 'asset_id': value,
-      if (instance.editedSlideTexts case final value?)
-        'edited_slide_texts': value,
+      'palette_override': instance.paletteOverride,
+      'tone_override': instance.toneOverride,
+      'match_style_post_id': instance.matchStylePostId,
+      'asset_id': instance.assetId,
+      'edited_slide_texts': instance.editedSlideTexts,
     };
 
 const _$Mode2StyleSourceEnumMap = {

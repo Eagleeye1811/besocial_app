@@ -6,9 +6,10 @@ import '../core/theme/theme_constants.dart';
 import 'dash_top_bar.dart';
 
 /// Bottom-nav scaffold shared by every signed-in dashboard surface
-/// (Home, Discover, Shortlist, Drafts, Calendar, Brand). Mirrors the web's
-/// `DashShell.jsx`. Tapping a tab does an `offAllNamed` so we don't pile
-/// up routes — the dashboard is a flat 6-way selector, not a stack.
+/// (Home, Discover, Shortlist, Drafts, Calendar). Brand is reached from the
+/// top bar instead of the nav. Mirrors the web's `DashShell.jsx`. Tapping a
+/// tab does an `offAllNamed` so we don't pile up routes — the dashboard is a
+/// flat 5-way selector, not a stack.
 class DashShell extends StatelessWidget {
   final DashTab currentTab;
   final Widget body;
@@ -75,7 +76,6 @@ class _DashBottomNav extends StatelessWidget {
         'Drafts'),
     _NavEntry(DashTab.calendar, Icons.calendar_today_outlined,
         Icons.calendar_today, 'Calendar'),
-    _NavEntry(DashTab.brand, Icons.palette_outlined, Icons.palette, 'Brand'),
   ];
 
   @override

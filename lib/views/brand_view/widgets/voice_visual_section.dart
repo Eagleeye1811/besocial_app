@@ -167,14 +167,14 @@ class _VoiceVisualSectionState extends State<VoiceVisualSection> {
       crossAxisCount: 2,
       mainAxisSpacing: 8,
       crossAxisSpacing: 8,
-      childAspectRatio: 3.0,
+      childAspectRatio: 2.7,
       children: kVoices.map((v) {
         final active = _voiceId == v.id;
         return InkWell(
           onTap: () => setState(() => _voiceId = v.id),
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: active ? AppColors.accentSoft : AppColors.white,
               border: Border.all(
