@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../common_widgets/app_snackbar.dart';
 import '../../core/constants/error_messages.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/services/logger_service.dart';
@@ -29,10 +30,9 @@ class ShortlistController extends GetxController {
   @override
   void onReady() {
     super.onReady();
+    // `refresh()` resumes in-flight polls itself once the list is loaded —
+    // don't resume here (items aren't fetched yet at this point).
     refresh();
-    // Resume polling for any items the server says are mid-generation —
-    // covers the case where the user closed the app during a generation.
-    _resumeInFlightPolls();
   }
 
   @override
@@ -51,6 +51,13 @@ class ShortlistController extends GetxController {
     try {
       final fresh = await _repo.getShortlist();
       items.assignAll(fresh);
+      // The backend never flips the shortlist row back from `generating` once
+      // a job finishes (only the generation job tracks completion). So for any
+      // item the server still reports as in-flight, resume polling its job —
+      // the poll reconciles it to `generated`/`failed`. Without this, a card
+      // whose generation already completed stays stuck on "Generating…" after
+      // navigating back to this screen.
+      _resumeInFlightPolls();
     } on ApiException catch (e) {
       errorMessage.value = resolveApiExceptionMessage(e);
       _log.w('GET /shortlist failed: ${e.code}');
@@ -71,17 +78,25 @@ class ShortlistController extends GetxController {
       await _repo.remove(item.postId);
     } on ApiException catch (e) {
       items.insert(idx, item);
-      Get.snackbar(
+      AppSnackbar.error(
         'Could not remove',
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
       );
     }
   }
 
-  /// Kick a fresh generation. Updates the card to `generating` then polls
-  /// the new job until terminal, replacing the card with the final status.
+  /// Kick a fresh generation. Mirrors the web `handleGenerate`: the card
+  /// flips to `generating` immediately (optimistic); on a failed kickoff it
+  /// reverts to `ready`; on success the job id is stashed and polled until
+  /// the card reaches a terminal status.
   Future<void> generate(ShortlistItemModel item) async {
+    // Optimistic flip — instant feedback before the POST resolves.
+    _replaceItem(
+      item.postId,
+      (current) => current.copyWith(
+        generationStatus: ShortlistGenerationStatus.generating,
+      ),
+    );
     try {
       final jobId = await _repo.generate(item.postId);
       _replaceItem(
@@ -93,10 +108,16 @@ class ShortlistController extends GetxController {
       );
       _spawnPollForJob(item.postId, jobId);
     } on ApiException catch (e) {
-      Get.snackbar(
+      // Kickoff failed — roll the card back to ready.
+      _replaceItem(
+        item.postId,
+        (current) => current.copyWith(
+          generationStatus: ShortlistGenerationStatus.ready,
+        ),
+      );
+      AppSnackbar.error(
         'Generation failed to start',
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
       );
       _log.w('POST /shortlist/{post_id}/generate failed: ${e.code}');
     }
@@ -162,10 +183,9 @@ class ShortlistController extends GetxController {
       await _repo.patchConfig(postId, patch);
       return true;
     } on ApiException catch (e) {
-      Get.snackbar(
+      AppSnackbar.error(
         'Could not save settings',
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
       );
       return false;
     }

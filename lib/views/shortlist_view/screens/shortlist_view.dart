@@ -29,9 +29,16 @@ class ShortlistView extends GetView<ShortlistController> {
 
             if (loading && items.isEmpty) {
               return ListView(
-                children: const [
-                  SizedBox(height: 200),
-                  Center(child: CircularProgressIndicator()),
+                children: [
+                  const SizedBox(height: 120),
+                  const Center(child: CircularProgressIndicator()),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      'Loading your shortlist…',
+                      style: TextStyle(fontSize: 14, color: AppColors.ink3),
+                    ),
+                  ),
                 ],
               );
             }
@@ -191,9 +198,21 @@ class _ErrorBlock extends StatelessWidget {
               size: 28, color: Color(0xFFDC2626)),
           const SizedBox(height: 10),
           Text(
+            "Couldn't load shortlist",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: AppFonts.display,
+              fontFamilyFallback: AppFonts.displayFallback,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppColors.ink2),
+            style: TextStyle(fontSize: 13, color: AppColors.ink3),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(

@@ -29,27 +29,39 @@ class ShortlistEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            'Your shortlist is empty',
+            'SHORTLIST · EMPTY',
+            style: TextStyle(
+              fontFamily: AppFonts.mono,
+              fontFamilyFallback: AppFonts.monoFallback,
+              fontSize: 11,
+              letterSpacing: 0.7,
+              fontWeight: FontWeight.w500,
+              color: AppColors.ink3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Nothing shortlisted yet',
             style: TextStyle(
               fontFamily: AppFonts.display,
               fontFamilyFallback: AppFonts.displayFallback,
-              fontSize: 20,
+              fontSize: 22,
               fontWeight: FontWeight.w600,
               color: AppColors.ink,
               letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
-            "Heart posts on Discover and they'll land here, ready to "
-            'generate from.',
+            "Find inspiration in the Discover tab — tap the heart on posts "
+            "you'd like to riff on. They'll show up here, ready to customize.",
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppColors.ink3, height: 1.5),
+            style: TextStyle(fontSize: 13.5, color: AppColors.ink3, height: 1.55),
           ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.explore_outlined, size: 16),
-            label: const Text('Open Discover'),
+          const SizedBox(height: 18),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.arrow_forward, size: 16),
+            label: const Text('Browse Discover'),
             onPressed: () => Get.offAllNamed(AppRoutes.discover),
           ),
         ],

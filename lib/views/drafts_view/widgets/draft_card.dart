@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../common_widgets/app_snackbar.dart';
 import '../../../controllers/drafts_controller/drafts_controller.dart';
 import '../../../core/theme/theme_constants.dart';
 import '../../../data/models/draft_model.dart';
@@ -39,9 +40,7 @@ class _DraftCardState extends State<DraftCard> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Posted to Instagram.')),
-      );
+      AppSnackbar.success('Posted to Instagram', 'Your carousel is now live.');
     }
   }
 
@@ -49,15 +48,11 @@ class _DraftCardState extends State<DraftCard> {
     if (_busy) return;
     setState(() => _busy = true);
     // The list payload doesn't carry slide URLs, so the controller fetches
-    // the job before opening each image externally.
-    final launched = await _controller.downloadSlides(draft.jobId);
+    // the job before saving each image to the gallery. It owns the result
+    // snackbars (saved / permission / failure).
+    await _controller.downloadSlides(draft.jobId);
     if (!mounted) return;
     setState(() => _busy = false);
-    if (launched == null || launched == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't open images to download.")),
-      );
-    }
   }
 
   @override
@@ -135,7 +130,7 @@ class _DraftCardState extends State<DraftCard> {
     return Obx(() {
       final connected = _controller.isInstagramConnected.value;
       final label = _busy
-          ? (connected ? 'Posting…' : 'Opening…')
+          ? (connected ? 'Posting…' : 'Saving…')
           : connected
               ? 'Post to Instagram'
               : draft.slideCount > 1

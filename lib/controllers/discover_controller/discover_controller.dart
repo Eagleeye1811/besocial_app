@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../common_widgets/app_snackbar.dart';
 import '../../core/constants/error_messages.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/cursor_pager.dart';
@@ -98,10 +99,9 @@ class DiscoverController extends GetxController {
       } else {
         shortlistedIds.remove(post.postId);
       }
-      Get.snackbar(
+      AppSnackbar.error(
         'Could not update shortlist',
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
       );
       _log.w('Shortlist toggle failed: ${e.code}');
     }

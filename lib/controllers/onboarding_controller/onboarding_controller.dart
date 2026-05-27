@@ -1,8 +1,9 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
+
+import '../../common_widgets/app_snackbar.dart';
 
 import '../../core/constants/error_messages.dart';
 import '../../core/network/api_exception.dart';
@@ -407,12 +408,9 @@ class OnboardingController extends GetxController {
         final authSvc = GetIt.I<AuthService>();
         if (authSvc.isAuthenticated) {
           _log.i('swipePost: authenticated — routing to onboardingGenerating');
-          Get.snackbar(
+          AppSnackbar.success(
             'Signed in',
             "We've got your session — heading to generation.",
-            snackPosition: SnackPosition.BOTTOM,
-            margin: const EdgeInsets.all(16),
-            duration: const Duration(seconds: 2),
           );
           Get.offAllNamed(AppRoutes.onboardingGenerating);
         } else {
@@ -427,14 +425,9 @@ class OnboardingController extends GetxController {
       errorMessage.value = resolveApiExceptionMessage(e);
       // Surface the failure prominently — the inline error pill at the
       // bottom of the inspiration grid is easy to miss.
-      Get.snackbar(
+      AppSnackbar.error(
         "Couldn't save",
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(16),
-        backgroundColor: const Color(0xFF18181B),
-        colorText: const Color(0xFFFFFFFF),
-        duration: const Duration(seconds: 4),
       );
     }
   }

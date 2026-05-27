@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../common_widgets/app_snackbar.dart';
 import '../../../controllers/drafts_controller/drafts_controller.dart';
 import '../../../core/theme/theme_constants.dart';
 import '../../../data/models/draft_model.dart';
@@ -28,6 +29,9 @@ class PostDetailSheet extends StatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      // Keep the sheet (drag handle + title) below the status bar / notch so
+      // the title is never tucked under it at tall drag sizes.
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -71,28 +75,22 @@ class _PostDetailSheetState extends State<PostDetailSheet> {
     setState(() => _posting = false);
     if (result != null) {
       Navigator.of(context).pop();
-      // Snackbar handled in controller for the failure path; surface a
-      // confirmation here for success since we know the result shape.
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Posted to Instagram.')),
-      );
+      // Failure snackbar is handled in the controller; confirm success here.
+      AppSnackbar.success('Posted to Instagram', 'Your carousel is now live.');
     }
   }
 
   Future<void> _download() async {
     if (_downloading) return;
     setState(() => _downloading = true);
-    final launched = await widget.controller.downloadSlides(
+    // Controller saves each slide to the gallery and owns the result
+    // snackbars (saved / permission / failure).
+    await widget.controller.downloadSlides(
       widget.draft.jobId,
       slides: _job?.slides,
     );
     if (!mounted) return;
     setState(() => _downloading = false);
-    if (launched == null || launched == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't open images to download.")),
-      );
-    }
   }
 
   @override
@@ -152,8 +150,6 @@ class _Header extends StatelessWidget {
       children: [
         Text(
           draft.captionPreview,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontFamily: AppFonts.display,
             fontFamilyFallback: AppFonts.displayFallback,
@@ -267,45 +263,20 @@ class _SlideCard extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            CachedNetworkImage(
-              imageUrl: slide.imageUrl,
-              fit: BoxFit.cover,
-              placeholder: (_, __) => Container(color: AppColors.surface2),
-              errorWidget: (_, __, ___) => Container(
-                color: AppColors.surface2,
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.broken_image_outlined,
-                  color: AppColors.ink4,
-                ),
-              ),
+        // The generated slide image already has its text rendered into it,
+        // so we show the image alone — no duplicate text overlay.
+        child: CachedNetworkImage(
+          imageUrl: slide.imageUrl,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => Container(color: AppColors.surface2),
+          errorWidget: (_, __, ___) => Container(
+            color: AppColors.surface2,
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.broken_image_outlined,
+              color: AppColors.ink4,
             ),
-            if (slide.slideText.isNotEmpty)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    slide.slideText,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     );
@@ -419,7 +390,7 @@ class _ActionBar extends StatelessWidget {
                             busy: downloading,
                             icon: Icons.download,
                             label: downloading
-                                ? 'Opening…'
+                                ? 'Saving…'
                                 : slideCount > 1
                                     ? 'Download images'
                                     : 'Download image',

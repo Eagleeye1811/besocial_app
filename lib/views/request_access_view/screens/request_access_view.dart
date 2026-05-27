@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../../common_widgets/app_snackbar.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_constants.dart';
 
@@ -93,10 +94,9 @@ class RequestAccessView extends StatelessWidget {
   Future<void> _copyMailto(BuildContext context) async {
     await Clipboard.setData(const ClipboardData(text: _mailtoBody));
     if (!context.mounted) return;
-    Get.snackbar(
+    AppSnackbar.success(
       'Link copied',
       "Paste it into your mail app to reach the team.",
-      snackPosition: SnackPosition.BOTTOM,
     );
   }
 }

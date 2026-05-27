@@ -1,8 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../common_widgets/app_snackbar.dart';
 import '../../../controllers/calendar_controller/calendar_controller.dart';
 import '../../../core/theme/theme_constants.dart';
 import '../../../data/models/scheduled_post_model.dart';
@@ -155,10 +155,9 @@ class _ScheduledDetailSheetState extends State<ScheduledDetailSheet> {
     final launched =
         await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
-      Get.snackbar(
+      AppSnackbar.error(
         "Couldn't open Instagram",
         'No app was able to handle this link.',
-        snackPosition: SnackPosition.BOTTOM,
       );
     }
   }

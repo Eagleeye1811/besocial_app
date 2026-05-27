@@ -45,6 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Saving generated slides to the photo library (gal). -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Growgram saves your generated posts to your photo library.</string>
 	<!--
 		Custom URL scheme — fallback for OAuth callback. Backend can be
 		configured to redirect to besocialapp://auth/callback#token=…

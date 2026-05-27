@@ -148,7 +148,8 @@ ShortlistItemModel _$ShortlistItemModelFromJson(Map<String, dynamic> json) =>
       format: json['format'] as String,
       slideCount: (json['slide_count'] as num).toInt(),
       generationStatus: $enumDecode(
-          _$ShortlistGenerationStatusEnumMap, json['generation_status']),
+          _$ShortlistGenerationStatusEnumMap, json['generation_status'],
+          unknownValue: ShortlistGenerationStatus.generating),
       generationJobId: json['generation_job_id'] as String?,
       shortlistedAt: DateTime.parse(json['shortlisted_at'] as String),
       extractionStatus: json['extraction_status'] as String?,

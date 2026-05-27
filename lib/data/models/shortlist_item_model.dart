@@ -53,7 +53,13 @@ class ShortlistItemModel extends HiveObject {
   @HiveField(7)
   final int slideCount;
 
+  // The backend's `/dashboard/shortlist` payload can report mid-pipeline
+  // statuses (`pending` / `analyzing` / `planning` / `rendering`) in addition
+  // to the four terminal-ish ones. The web treats every in-flight stage as
+  // "generating" (and resumes polling for it); mapping unknown wire values to
+  // `generating` reproduces that and stops `fromJson` throwing on them.
   @HiveField(8)
+  @JsonKey(unknownEnumValue: ShortlistGenerationStatus.generating)
   final ShortlistGenerationStatus generationStatus;
 
   @HiveField(9)

@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../common_widgets/app_snackbar.dart';
+
 import '../../core/constants/error_messages.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/routes/app_routes.dart';
@@ -60,12 +62,11 @@ class InstagramController extends GetxController {
       );
       if (result is InstagramConnectSuccess) {
         await refreshStatus();
-        Get.snackbar(
+        AppSnackbar.success(
           'Instagram connected',
           result.username != null
               ? 'Linked to @${result.username}.'
               : 'Linked successfully.',
-          snackPosition: SnackPosition.BOTTOM,
         );
       } else if (result is OAuthError &&
           result.reason != OAuthError.clientCancelled) {

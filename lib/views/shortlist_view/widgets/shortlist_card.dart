@@ -9,16 +9,54 @@ import '../../../core/theme/theme_constants.dart';
 import '../../../data/models/shortlist_item_model.dart';
 import 'mode2_config_sheet.dart';
 
-// State-driven tints (mirrors ShortlistCard.jsx). Greens/reds match the web
-// hex values; orange uses the shared accent token.
-const Color _greenBorder = Color(0xFFB7DCBE);
+// Soft, borderless lift used for every shortlist card — two layers give a
+// clean sense of depth without any outline.
+const List<BoxShadow> _cardShadow = [
+  BoxShadow(color: Color(0x0A18181B), offset: Offset(0, 1), blurRadius: 3),
+  BoxShadow(color: Color(0x0F18181B), offset: Offset(0, 10), blurRadius: 26),
+];
+
+// Soft, color-matched shadows for the solid primary / success pills.
+const List<BoxShadow> _accentShadow = [
+  BoxShadow(color: Color(0x33F47B42), offset: Offset(0, 8), blurRadius: 18),
+];
+const List<BoxShadow> _greenShadow = [
+  BoxShadow(color: Color(0x2916A34A), offset: Offset(0, 8), blurRadius: 18),
+];
+
+// Soft success/error tints for the badge and failed-state alert.
 const Color _greenBg = Color(0xFFEDF7EE);
 const Color _greenInk = Color(0xFF15803D);
-const Color _redBorder = Color(0xFFF0C9C0);
 const Color _redBg = Color(0xFFFBF1EE);
+const Color _redBorder = Color(0xFFF0C9C0);
 const Color _redIcon = Color(0xFFE8B6A8);
 const Color _redTitle = Color(0xFF8B3A1F);
 const Color _redBody = Color(0xFF6B3318);
+
+/// Full-width solid pill button — the shared shape for the primary
+/// "Generate post" and the success "View in drafts" actions.
+Widget _pillButton({
+  required Widget child,
+  required Color color,
+  required List<BoxShadow> shadow,
+  VoidCallback? onTap,
+}) {
+  return DecoratedBox(
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(14),
+      boxShadow: shadow,
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(height: 52, child: Center(child: child)),
+      ),
+    ),
+  );
+}
 
 /// One card in the shortlist. Thumbnail + reference on the left, a fully
 /// state-driven action column below. Card border/shadow, the generated
@@ -32,56 +70,16 @@ class ShortlistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<ShortlistController>();
-    final status = item.generationStatus;
-    final isGenerating = status == ShortlistGenerationStatus.generating;
-    final isGenerated = status == ShortlistGenerationStatus.generated;
-    final isFailed = status == ShortlistGenerationStatus.failed;
-
-    final borderColor = isGenerated
-        ? _greenBorder
-        : isFailed
-            ? const Color(0xFFF4C7C7)
-            : isGenerating
-                ? AppColors.accent
-                : AppColors.line;
-
-    final shadow = isGenerating
-        ? const [
-            BoxShadow(
-              color: Color(0x29F47B42),
-              offset: Offset(0, 10),
-              blurRadius: 26,
-            ),
-          ]
-        : isGenerated
-            ? const [
-                BoxShadow(
-                  color: Color(0x1A15803D),
-                  offset: Offset(0, 6),
-                  blurRadius: 18,
-                ),
-              ]
-            : isFailed
-                ? const [
-                    BoxShadow(
-                      color: Color(0x1A992A2A),
-                      offset: Offset(0, 6),
-                      blurRadius: 18,
-                    ),
-                  ]
-                : AppShadows.card;
+    final isGenerated =
+        item.generationStatus == ShortlistGenerationStatus.generated;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.white,
-        border: Border.all(
-          color: borderColor,
-          width: isGenerating ? 1.5 : 1,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: shadow,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: _cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -237,21 +235,25 @@ class _ReadyActions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ElevatedButton.icon(
-          onPressed: onGenerate,
-          icon: const Icon(Icons.auto_awesome, size: 16),
-          label: const Text('Generate post'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: AppColors.white,
-            minimumSize: const Size(0, 46),
-            textStyle: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+        _pillButton(
+          color: AppColors.accent,
+          shadow: _accentShadow,
+          onTap: onGenerate,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_awesome_rounded, size: 18, color: AppColors.white),
+              SizedBox(width: 9),
+              Text(
+                'Generate post',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                  color: AppColors.white,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -308,10 +310,10 @@ class _GeneratingPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          height: 46,
+          height: 52,
           decoration: BoxDecoration(
             color: AppColors.ink,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
           alignment: Alignment.center,
           child: Row(
@@ -332,20 +334,20 @@ class _GeneratingPanel extends StatelessWidget {
                   fontFamily: AppFonts.ui,
                   fontFamilyFallback: AppFonts.uiFallback,
                   fontSize: 14.5,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
                   color: AppColors.white,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border.all(color: AppColors.line2),
-            borderRadius: BorderRadius.circular(10),
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
@@ -374,28 +376,26 @@ class _GeneratedActions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        OutlinedButton(
-          onPressed: () => Get.offAllNamed(AppRoutes.drafts),
-          style: OutlinedButton.styleFrom(
-            backgroundColor: _greenBg,
-            foregroundColor: _greenInk,
-            minimumSize: const Size(0, 46),
-            side: const BorderSide(color: _greenBorder),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              _CheckCircle(),
-              SizedBox(width: 10),
+        _pillButton(
+          color: AppColors.good,
+          shadow: _greenShadow,
+          onTap: () => Get.offAllNamed(AppRoutes.drafts),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle_rounded, size: 19, color: AppColors.white),
+              SizedBox(width: 9),
               Text(
                 'View in drafts',
-                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                  color: AppColors.white,
+                ),
               ),
               SizedBox(width: 6),
-              Icon(Icons.arrow_forward, size: 15, color: _greenInk),
+              Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.white),
             ],
           ),
         ),
@@ -428,24 +428,6 @@ class _GeneratedActions extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _CheckCircle extends StatelessWidget {
-  const _CheckCircle();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: const BoxDecoration(
-        color: _greenInk,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: const Icon(Icons.check, size: 13, color: AppColors.white),
     );
   }
 }
@@ -606,22 +588,22 @@ class _GeneratedBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.fromLTRB(8, 4, 11, 4),
       decoration: BoxDecoration(
         color: _greenBg,
-        border: Border.all(color: _greenBorder),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: const [
-          Icon(Icons.check, size: 12, color: _greenInk),
+          Icon(Icons.check_circle_rounded, size: 14, color: _greenInk),
           SizedBox(width: 5),
           Text(
             'Generated',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
+              letterSpacing: 0.1,
               color: _greenInk,
             ),
           ),

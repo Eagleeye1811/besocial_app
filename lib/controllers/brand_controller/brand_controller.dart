@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../common_widgets/app_snackbar.dart';
 import '../../core/constants/error_messages.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/services/logger_service.dart';
@@ -60,17 +61,15 @@ class BrandController extends GetxController {
     isSaving.value = true;
     try {
       profile.value = await _repo.patchProfile(patch);
-      Get.snackbar(
+      AppSnackbar.success(
         'Saved',
         'Your brand profile was updated.',
-        snackPosition: SnackPosition.BOTTOM,
       );
       return true;
     } on ApiException catch (e) {
-      Get.snackbar(
+      AppSnackbar.error(
         'Save failed',
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
       );
       _log.w('PATCH /brand failed: ${e.code}');
       return false;
@@ -104,10 +103,9 @@ class BrandController extends GetxController {
       }
       return created;
     } on ApiException catch (e) {
-      Get.snackbar(
+      AppSnackbar.error(
         'Upload failed',
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
       );
       _log.w('POST /brand/assets failed: ${e.code}');
       return null;
@@ -122,10 +120,9 @@ class BrandController extends GetxController {
       await _repo.deleteAsset(asset.assetId);
     } on ApiException catch (e) {
       assets.insert(idx, asset);
-      Get.snackbar(
+      AppSnackbar.error(
         'Could not remove',
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
       );
     }
   }
@@ -157,10 +154,9 @@ class BrandController extends GetxController {
             'asset to make it primary for now.';
       } else {
         _log.w('PATCH /brand/assets primary failed: ${e.code}');
-        Get.snackbar(
+        AppSnackbar.error(
           'Could not set primary',
           resolveApiExceptionMessage(e),
-          snackPosition: SnackPosition.BOTTOM,
         );
       }
     }

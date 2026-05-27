@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../common_widgets/app_snackbar.dart';
 import '../../core/constants/error_messages.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/services/logger_service.dart';
@@ -90,10 +91,9 @@ class CalendarController extends GetxController {
       return true;
     } on ApiException catch (e) {
       posts.insert(index, removed);
-      Get.snackbar(
+      AppSnackbar.error(
         'Could not cancel',
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
       );
       _log.w('DELETE /dashboard/scheduled-posts/$scheduledPostId failed: '
           '${e.code}');
@@ -113,10 +113,9 @@ class CalendarController extends GetxController {
       }
       return true;
     } on ApiException catch (e) {
-      Get.snackbar(
+      AppSnackbar.error(
         'Could not save caption',
         resolveApiExceptionMessage(e),
-        snackPosition: SnackPosition.BOTTOM,
       );
       _log.w('PATCH /dashboard/scheduled-posts/$scheduledPostId failed: '
           '${e.code}');

@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Saving generated slides to the gallery (gal). API 30+ uses scoped
+         storage / MediaStore and needs no permission; only legacy API ≤ 29
+         requires WRITE_EXTERNAL_STORAGE. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
 
     <application
         android:label="besocial_app"

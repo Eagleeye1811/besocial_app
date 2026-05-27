@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../common_widgets/app_snackbar.dart';
 import '../../../controllers/instagram_controller/instagram_controller.dart';
 import '../../../controllers/onboarding_controller/onboarding_controller.dart';
 import '../../../core/routes/app_routes.dart';
@@ -118,13 +119,11 @@ class _ResultStepState extends State<ResultStep> {
 
     if (ig.isConnected) {
       final handle = ig.connectedUsername;
-      Get.snackbar(
+      AppSnackbar.success(
         'Drafted to Instagram',
         handle != null
             ? 'Your post is queued for @$handle. Publish it from Drafts when you’re ready.'
             : 'Your post is queued. Publish it from Drafts when you’re ready.',
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(16),
       );
       setState(() => _checkingInstagram = false);
       Get.offAllNamed<void>(AppRoutes.drafts);
