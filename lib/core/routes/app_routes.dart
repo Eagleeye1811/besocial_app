@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../common_widgets/dash_shell.dart';
 import '../../controllers/auth_controller/auth_bindings.dart';
 import '../../controllers/brand_controller/brand_bindings.dart';
+import '../../controllers/calendar_controller/calendar_bindings.dart';
 import '../../controllers/discover_controller/discover_bindings.dart';
 import '../../controllers/drafts_controller/drafts_bindings.dart';
 import '../../controllers/home_controller/home_bindings.dart';
@@ -11,6 +12,7 @@ import '../../controllers/settings_controller/settings_bindings.dart';
 import '../../controllers/shortlist_controller/shortlist_bindings.dart';
 import '../../controllers/splash_controller/splash_bindings.dart';
 import '../../views/brand_view/screens/brand_view.dart';
+import '../../views/calendar_view/screens/calendar_view.dart';
 import '../../views/discover_view/screens/discover_view.dart';
 import '../../views/drafts_view/screens/drafts_view.dart';
 import '../../views/home_view/screens/home_view.dart';
@@ -60,6 +62,7 @@ class AppRoutes {
   static const String discover = '/discover';
   static const String shortlist = '/shortlist';
   static const String drafts = '/drafts';
+  static const String calendar = '/calendar';
   static const String brand = '/brand';
 
   // ==========================================
@@ -145,6 +148,13 @@ class AppRoutes {
       name: drafts,
       page: () => const DraftsView(),
       binding: DraftsBindings(),
+      transition: Transition.fadeIn,
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage<void>(
+      name: calendar,
+      page: () => const CalendarView(),
+      binding: CalendarBindings(),
       transition: Transition.fadeIn,
       middlewares: [AuthMiddleware()],
     ),

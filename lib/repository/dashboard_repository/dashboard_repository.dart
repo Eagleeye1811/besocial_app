@@ -16,6 +16,12 @@ abstract class DashboardRepository {
   Future<DashboardHomeDto> getHome();
   Future<List<DashboardRecentPostDto>> getRecentPosts({int limit = 5});
   Future<List<DashboardTrendingPostDto>> getTrending({int limit = 5});
+
+  /// Record a swipe on a trending/discover post. `action` is the wire-format
+  /// literal `"shortlisted"` | `"skipped"`. Mirrors the web's
+  /// `swipeDiscover(postId, action)` in `lib/api/dashboard.js` — the Home
+  /// trending heart fires this directly.
+  Future<void> swipeDiscover({required String postId, required String action});
 }
 
 class DashboardRepositoryImpl implements DashboardRepository {
@@ -58,6 +64,19 @@ class DashboardRepositoryImpl implements DashboardRepository {
             (e) => DashboardTrendingPostDto.fromJson(e as Map<String, dynamic>),
           )
           .toList();
+    });
+  }
+
+  @override
+  Future<void> swipeDiscover({
+    required String postId,
+    required String action,
+  }) {
+    return unwrapDio(() async {
+      await _dio.post<dynamic>(
+        '/api/v1/dashboard/discover/swipe',
+        data: {'post_id': postId, 'action': action},
+      );
     });
   }
 }

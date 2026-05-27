@@ -5,6 +5,8 @@ import '../../../common_widgets/dash_shell.dart';
 import '../../../controllers/discover_controller/discover_controller.dart';
 import '../../../core/theme/theme_constants.dart';
 import '../widgets/discover_grid.dart';
+import '../widgets/discover_mode_toggle.dart';
+import '../widgets/discover_swipe_view.dart';
 import '../widgets/filter_bar.dart';
 import '../widgets/refresh_notice.dart';
 
@@ -44,9 +46,17 @@ class DiscoverView extends GetView<DiscoverController> {
               const SliverToBoxAdapter(child: SizedBox(height: 4)),
               const SliverToBoxAdapter(child: RefreshNotice()),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              const SliverToBoxAdapter(child: DiscoverModeToggle()),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
               const SliverToBoxAdapter(child: DiscoverFilterBar()),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
-              const SliverToBoxAdapter(child: DiscoverGrid()),
+              SliverToBoxAdapter(
+                child: Obx(
+                  () => controller.viewMode.value == DiscoverViewMode.swipe
+                      ? const DiscoverSwipeView()
+                      : const DiscoverGrid(),
+                ),
+              ),
             ],
           ),
         ),

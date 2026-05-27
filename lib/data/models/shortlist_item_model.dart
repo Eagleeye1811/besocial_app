@@ -62,6 +62,26 @@ class ShortlistItemModel extends HiveObject {
   @HiveField(10)
   final DateTime shortlistedAt;
 
+  /// OCR status for the source-post slide text, used by the Mode 2 sheet:
+  /// `pending` / `extracting` / `done` / `failed` (or null if never run).
+  @HiveField(11)
+  final String? extractionStatus;
+
+  /// Per-slide OCR'd text, in slide order. Empty/null until extraction
+  /// completes; pre-fills the Mode 2 slide-text editors.
+  @HiveField(12)
+  final List<String>? extractedSlideTexts;
+
+  /// User-facing failure message captured when a generation fails — drives
+  /// the shortlist card's failed-state copy alongside [generationErrorCode].
+  @HiveField(13)
+  final String? generationError;
+
+  /// Canonical backend error code (e.g. `IP_RESTRICTION`) for the failed
+  /// state; mapped to copy + actions by `generation_error_copy.dart`.
+  @HiveField(14)
+  final String? generationErrorCode;
+
   ShortlistItemModel({
     required this.postId,
     required this.authorHandle,
@@ -74,10 +94,43 @@ class ShortlistItemModel extends HiveObject {
     required this.generationStatus,
     this.generationJobId,
     required this.shortlistedAt,
+    this.extractionStatus,
+    this.extractedSlideTexts,
+    this.generationError,
+    this.generationErrorCode,
   });
 
   factory ShortlistItemModel.fromJson(Map<String, dynamic> json) =>
       _$ShortlistItemModelFromJson(json);
 
   Map<String, dynamic> toJson() => _$ShortlistItemModelToJson(this);
+
+  /// Field-preserving copy. New fields default to the current value so
+  /// status flips (and error capture) never silently drop data.
+  ShortlistItemModel copyWith({
+    ShortlistGenerationStatus? generationStatus,
+    String? generationJobId,
+    String? extractionStatus,
+    List<String>? extractedSlideTexts,
+    String? generationError,
+    String? generationErrorCode,
+  }) {
+    return ShortlistItemModel(
+      postId: postId,
+      authorHandle: authorHandle,
+      thumbnailUrl: thumbnailUrl,
+      images: images,
+      caption: caption,
+      likeCount: likeCount,
+      format: format,
+      slideCount: slideCount,
+      generationStatus: generationStatus ?? this.generationStatus,
+      generationJobId: generationJobId ?? this.generationJobId,
+      shortlistedAt: shortlistedAt,
+      extractionStatus: extractionStatus ?? this.extractionStatus,
+      extractedSlideTexts: extractedSlideTexts ?? this.extractedSlideTexts,
+      generationError: generationError ?? this.generationError,
+      generationErrorCode: generationErrorCode ?? this.generationErrorCode,
+    );
+  }
 }

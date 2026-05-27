@@ -84,11 +84,13 @@ class ShortlistController extends GetxController {
   Future<void> generate(ShortlistItemModel item) async {
     try {
       final jobId = await _repo.generate(item.postId);
-      _replaceItem(item.postId, (current) => _withStatus(
-            current,
-            ShortlistGenerationStatus.generating,
-            jobId: jobId,
-          ));
+      _replaceItem(
+        item.postId,
+        (current) => current.copyWith(
+          generationStatus: ShortlistGenerationStatus.generating,
+          generationJobId: jobId,
+        ),
+      );
       _spawnPollForJob(item.postId, jobId);
     } on ApiException catch (e) {
       Get.snackbar(
@@ -117,22 +119,27 @@ class ShortlistController extends GetxController {
 
     _generation.pollUntilTerminal(jobId, cancel: cancel).then((job) {
       _activePolls.remove(postId);
-      final nextStatus = job.status == GenerationJobStatus.completed
-          ? ShortlistGenerationStatus.generated
-          : ShortlistGenerationStatus.failed;
+      final completed = job.status == GenerationJobStatus.completed;
       _replaceItem(
         postId,
-        (current) => _withStatus(current, nextStatus, jobId: jobId),
+        (current) => current.copyWith(
+          generationStatus: completed
+              ? ShortlistGenerationStatus.generated
+              : ShortlistGenerationStatus.failed,
+          generationJobId: jobId,
+          // Capture the failure cause so the card can render mapped copy.
+          generationError: completed ? null : job.errorMessage,
+          generationErrorCode: completed ? null : job.errorCode,
+        ),
       );
     }).catchError((Object e, StackTrace st) {
       _activePolls.remove(postId);
       _log.w('Poll for $jobId errored: $e');
       _replaceItem(
         postId,
-        (current) => _withStatus(
-          current,
-          ShortlistGenerationStatus.failed,
-          jobId: jobId,
+        (current) => current.copyWith(
+          generationStatus: ShortlistGenerationStatus.failed,
+          generationJobId: jobId,
         ),
       );
     });
@@ -174,25 +181,5 @@ class ShortlistController extends GetxController {
     final idx = items.indexWhere((x) => x.postId == postId);
     if (idx < 0) return;
     items[idx] = transform(items[idx]);
-  }
-
-  ShortlistItemModel _withStatus(
-    ShortlistItemModel current,
-    ShortlistGenerationStatus next, {
-    String? jobId,
-  }) {
-    return ShortlistItemModel(
-      postId: current.postId,
-      authorHandle: current.authorHandle,
-      thumbnailUrl: current.thumbnailUrl,
-      images: current.images,
-      caption: current.caption,
-      likeCount: current.likeCount,
-      format: current.format,
-      slideCount: current.slideCount,
-      generationStatus: next,
-      generationJobId: jobId ?? current.generationJobId,
-      shortlistedAt: current.shortlistedAt,
-    );
   }
 }

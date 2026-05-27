@@ -32,7 +32,10 @@ class BrandPatchDto {
 
   // Content preferences
   final String? facePreference;
-  final bool? faceInContent;
+
+  /// Free-form note on face usage (backend `face_in_content: Optional[str]`).
+  /// Sent only when [facePreference] == 'appears_in_content'.
+  final String? faceInContent;
   final List<String>? contentPillars;
   final bool? hasProduct;
 

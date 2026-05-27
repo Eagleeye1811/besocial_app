@@ -10,6 +10,9 @@ import '../../core/services/logger_service.dart';
 import '../../data/models/discover_post_model.dart';
 import '../../repository/discover_repository/discover_repository.dart';
 
+/// Discover surface view modes — mirrors the web `ModeToggle` (Grid | Swipe).
+enum DiscoverViewMode { grid, swipe }
+
 /// Drives `/discover`. Owns a [CursorPager] for the paginated grid plus
 /// two side-cars: the format filter and the auto-refresh countdown state.
 class DiscoverController extends GetxController {
@@ -19,6 +22,17 @@ class DiscoverController extends GetxController {
   late final CursorPager<DiscoverPostModel> pager;
 
   final Rx<DiscoverFormat> selectedFormat = DiscoverFormat.all.obs;
+
+  /// Grid vs. swipe presentation. Defaults to grid (the existing surface).
+  final Rx<DiscoverViewMode> viewMode = DiscoverViewMode.grid.obs;
+
+  /// Count of posts shortlisted this session — drives the swipe-view counter.
+  final RxInt sessionShortlistCount = 0.obs;
+
+  /// History of posts skipped in swipe mode, newest last. Powers "Undo last
+  /// skip" which re-inserts the post at the front of the pager (mirrors web,
+  /// which restores locally without a server round-trip).
+  final RxList<DiscoverPostModel> skippedHistory = <DiscoverPostModel>[].obs;
 
   // Refresh-cadence state, sourced from the latest feed response.
   final Rxn<DateTime> nextRefreshAt = Rxn<DateTime>();
@@ -67,24 +81,47 @@ class DiscoverController extends GetxController {
   }
 
   // ===========================================
+  // View mode
+  // ===========================================
+  void setViewMode(DiscoverViewMode mode) {
+    if (viewMode.value == mode) return;
+    viewMode.value = mode;
+  }
+
+  // ===========================================
   // Swipe
   // ===========================================
   Future<void> shortlist(DiscoverPostModel post) async {
-    await _swipeAndRemove(post, 'shortlisted');
+    final ok = await _swipeAndRemove(post, 'shortlisted');
+    if (ok) sessionShortlistCount.value++;
   }
 
   Future<void> skip(DiscoverPostModel post) async {
-    await _swipeAndRemove(post, 'skipped');
+    final ok = await _swipeAndRemove(post, 'skipped');
+    if (ok) {
+      skippedHistory.add(post);
+    }
   }
 
-  Future<void> _swipeAndRemove(
-      DiscoverPostModel post, String action) async {
-    // Optimistic: drop from the visible feed first, restore on failure.
+  /// Re-inserts the most recently skipped post at the front of the pager so
+  /// it becomes the current swipe card again. Mirrors the web behaviour of a
+  /// purely local restore — no opposite-action server call.
+  void undoLastSkip() {
+    if (skippedHistory.isEmpty) return;
+    final post = skippedHistory.removeLast();
+    if (pager.items.any((p) => p.postId == post.postId)) return;
+    pager.items.insert(0, post);
+  }
+
+  /// Optimistically drops [post] from the visible feed; restores on failure.
+  /// Returns `true` when the swipe was accepted by the backend.
+  Future<bool> _swipeAndRemove(DiscoverPostModel post, String action) async {
     final originalIndex = pager.items.indexWhere((p) => p.postId == post.postId);
-    if (originalIndex < 0) return;
+    if (originalIndex < 0) return false;
     pager.items.removeAt(originalIndex);
     try {
       await _repo.swipe(postId: post.postId, action: action);
+      return true;
     } on ApiException catch (e) {
       pager.items.insert(originalIndex, post);
       Get.snackbar(
@@ -93,6 +130,7 @@ class DiscoverController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
       _log.w('Swipe failed: ${e.code}');
+      return false;
     }
   }
 

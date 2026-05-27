@@ -14,6 +14,7 @@ import 'repository/drafts_repository/drafts_repository.dart';
 import 'repository/generation_repository/generation_repository.dart';
 import 'repository/instagram_repository/instagram_repository.dart';
 import 'repository/onboarding_repository/onboarding_repository.dart';
+import 'repository/scheduled_posts_repository/scheduled_posts_repository.dart';
 import 'repository/session_repository/session_repository.dart';
 import 'repository/shortlist_repository/shortlist_repository.dart';
 
@@ -74,6 +75,9 @@ Future<void> setupDependencyInjection() async {
   );
   getIt.registerLazySingleton<DraftsRepository>(
     () => DraftsRepositoryImpl(getIt<DioClient>()),
+  );
+  getIt.registerLazySingleton<ScheduledPostsRepository>(
+    () => ScheduledPostsRepositoryImpl(getIt<DioClient>()),
   );
   getIt.registerLazySingleton<InstagramRepository>(
     () => InstagramRepositoryImpl(getIt<DioClient>()),

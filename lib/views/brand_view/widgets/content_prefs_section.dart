@@ -5,8 +5,12 @@ import '../../../controllers/brand_controller/brand_controller.dart';
 import '../../../core/theme/theme_constants.dart';
 import '../../../data/dto/brand_patch_dto.dart';
 import '../../../data/models/brand_profile_model.dart';
+import 'brand_options.dart';
 import 'section_card.dart';
 
+/// Content preferences — face preference, conditional face note, content
+/// pillar chips, has-product toggle. Disabled until personalization is set
+/// during onboarding. Mirrors ContentPrefsSection.jsx.
 class ContentPrefsSection extends StatefulWidget {
   final BrandProfileModel profile;
   const ContentPrefsSection({super.key, required this.profile});
@@ -17,97 +21,150 @@ class ContentPrefsSection extends StatefulWidget {
 
 class _ContentPrefsSectionState extends State<ContentPrefsSection> {
   String? _facePreference;
-  bool _faceInContent = false;
+  late final TextEditingController _faceNote;
+  late List<String> _pillars;
   bool _hasProduct = false;
-  late final TextEditingController _pillars;
+
+  bool get _isInitialized => widget.profile.personalization != null;
 
   @override
   void initState() {
     super.initState();
     final p = widget.profile.personalization ?? const <String, dynamic>{};
     _facePreference = p['face_preference'] as String?;
-    _faceInContent = p['face_in_content'] as bool? ?? false;
-    _hasProduct = p['has_product'] as bool? ?? false;
+    _faceNote =
+        TextEditingController(text: (p['face_in_content'] as String?) ?? '');
     final pillars = p['content_pillars'];
-    _pillars = TextEditingController(
-      text: pillars is List ? pillars.join(', ') : '',
-    );
+    _pillars = pillars is List ? List<String>.from(pillars) : <String>[];
+    _hasProduct = p['has_product'] as bool? ?? false;
   }
 
   @override
   void dispose() {
-    _pillars.dispose();
+    _faceNote.dispose();
     super.dispose();
+  }
+
+  /// Suggested pillar chips: prefer the user's confirmed topics from niche
+  /// analysis, then suggested topics, then a generic fallback. Mirrors the
+  /// web's suggestedPillars resolution.
+  List<String> get _suggestedPillars {
+    final niche = widget.profile.niche;
+    if (niche != null) {
+      final confirmed = niche['confirmed_topics'];
+      if (confirmed is List && confirmed.isNotEmpty) {
+        return confirmed.map((e) => e.toString()).toList();
+      }
+      final suggested = niche['suggested_topics'];
+      if (suggested is List && suggested.isNotEmpty) {
+        return suggested.map((e) => e.toString()).toList();
+      }
+    }
+    return kDefaultPillarSuggestions;
+  }
+
+  void _togglePillar(String pillar) {
+    setState(() {
+      if (_pillars.contains(pillar)) {
+        _pillars.remove(pillar);
+      } else {
+        _pillars.add(pillar);
+      }
+    });
   }
 
   Future<void> _save() async {
     final controller = Get.find<BrandController>();
-    final pillarsList = _pillars.text
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
+    final note = _faceNote.text.trim();
     await controller.patchSection(BrandPatchDto(
       facePreference: _facePreference,
-      faceInContent: _faceInContent,
+      // Only send the free-form note when the user appears in content.
+      faceInContent: _facePreference == 'appears_in_content'
+          ? (note.isEmpty ? null : note)
+          : null,
+      contentPillars: _pillars,
       hasProduct: _hasProduct,
-      contentPillars: pillarsList.isEmpty ? null : pillarsList,
     ));
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<BrandController>();
+    final showFaceNote = _facePreference == 'appears_in_content';
+
     return BrandSectionCard(
       eyebrow: 'Content prefs',
       title: 'What goes into every post',
-      actions: Obx(() => ElevatedButton(
-            onPressed: controller.isSaving.value ? null : _save,
-            child: Text(controller.isSaving.value ? 'Saving…' : 'Save'),
-          )),
+      actions: _isInitialized
+          ? Obx(() => ElevatedButton(
+                onPressed: controller.isSaving.value ? null : _save,
+                child: Text(controller.isSaving.value ? 'Saving…' : 'Save'),
+              ))
+          : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Eyebrow(text: 'Face preference'),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _RadioPill(
-                label: 'Appears in content',
-                selected: _facePreference == 'appears_in_content',
-                onTap: () => setState(
-                    () => _facePreference = 'appears_in_content'),
-              ),
-              const SizedBox(width: 8),
-              _RadioPill(
-                label: 'No face',
-                selected: _facePreference == 'no_face',
-                onTap: () => setState(() => _facePreference = 'no_face'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            value: _faceInContent,
-            onChanged: (v) => setState(() => _faceInContent = v ?? false),
-            title: const Text('Show my face in slides when relevant'),
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            value: _hasProduct,
-            onChanged: (v) => setState(() => _hasProduct = v ?? false),
-            title: const Text('I sell a product (vs. service-only)'),
-          ),
-          const SizedBox(height: 8),
-          BrandLabeledField(
-            label: 'Content pillars (comma-separated)',
-            controller: _pillars,
-            hint: 'transformations, behind-the-scenes, education',
-            minLines: 2,
-            maxLines: 4,
+          if (!_isInitialized)
+            const BrandDisabledReason(
+              "Personalization is set during onboarding. Once it's set, you "
+              'can change it here.',
+            ),
+          BrandDisabledGate(
+            disabled: !_isInitialized,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const BrandSubLabel('Do you appear in your content?'),
+                const SizedBox(height: 10),
+                Row(
+                  children: kFacePreferenceOptions.map((opt) {
+                    final active = _facePreference == opt.id;
+                    final isFirst = opt == kFacePreferenceOptions.first;
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(right: isFirst ? 10 : 0),
+                        child: _OptionCard(
+                          label: opt.label,
+                          active: active,
+                          onTap: () =>
+                              setState(() => _facePreference = opt.id),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                if (showFaceNote) ...[
+                  const SizedBox(height: 14),
+                  BrandLabeledField(
+                    label: 'Note for the AI (optional)',
+                    controller: _faceNote,
+                    hint: 'e.g. Use the cleaner studio photos, not the candid '
+                        'ones.',
+                    minLines: 2,
+                    maxLines: 3,
+                  ),
+                ],
+                const SizedBox(height: 18),
+                const BrandSubLabel('Content pillars'),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _suggestedPillars
+                      .map((pillar) => BrandChip(
+                            label: pillar,
+                            active: _pillars.contains(pillar),
+                            onTap: () => _togglePillar(pillar),
+                          ))
+                      .toList(),
+                ),
+                const SizedBox(height: 18),
+                _ProductToggle(
+                  value: _hasProduct,
+                  onChanged: (v) => setState(() => _hasProduct = v),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -115,32 +172,14 @@ class _ContentPrefsSectionState extends State<ContentPrefsSection> {
   }
 }
 
-class _Eyebrow extends StatelessWidget {
-  final String text;
-  const _Eyebrow({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontFamily: AppFonts.mono,
-        fontFamilyFallback: AppFonts.monoFallback,
-        fontSize: 10.5,
-        letterSpacing: 0.4,
-        color: AppColors.ink4,
-      ),
-    );
-  }
-}
-
-class _RadioPill extends StatelessWidget {
+/// Full-width selectable card used for the face-preference choice.
+class _OptionCard extends StatelessWidget {
   final String label;
-  final bool selected;
+  final bool active;
   final VoidCallback onTap;
-  const _RadioPill({
+  const _OptionCard({
     required this.label,
-    required this.selected,
+    required this.active,
     required this.onTap,
   });
 
@@ -148,24 +187,95 @@ class _RadioPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: selected ? AppColors.accentSoft : AppColors.white,
+          color: active ? AppColors.accentSoft : AppColors.white,
           border: Border.all(
-            color: selected ? AppColors.accent : AppColors.line,
-            width: selected ? 1.5 : 1,
+            color: active ? AppColors.accent : AppColors.line,
+            width: active ? 1.5 : 1,
           ),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: selected ? AppColors.accentInk : AppColors.ink2,
+            fontFamily: AppFonts.ui,
+            fontFamilyFallback: AppFonts.uiFallback,
+            fontSize: 13.5,
+            fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+            color: active ? AppColors.accentInk : AppColors.ink2,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Has-product checkbox row with label + description. Mirrors the web's
+/// "Show product photos in posts" toggle.
+class _ProductToggle extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const _ProductToggle({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: value ? AppColors.accentSoft : AppColors.white,
+          border: Border.all(color: AppColors.line),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: Checkbox(
+                value: value,
+                onChanged: (v) => onChanged(v ?? false),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                activeColor: AppColors.accent,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Show product photos in posts',
+                    style: TextStyle(
+                      fontFamily: AppFonts.ui,
+                      fontFamilyFallback: AppFonts.uiFallback,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'The AI will use your uploaded product images when '
+                    'generating.',
+                    style: TextStyle(
+                      fontFamily: AppFonts.ui,
+                      fontFamilyFallback: AppFonts.uiFallback,
+                      fontSize: 12,
+                      color: AppColors.ink3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

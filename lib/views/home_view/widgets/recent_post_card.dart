@@ -99,10 +99,14 @@ class RecentPostCard extends StatelessWidget {
     );
   }
 
+  // Thousands-separated, matching the web's `formatNumber(like_count)`.
   static String _compactNumber(int n) {
-    if (n < 1000) return '$n';
-    if (n < 10000) return '${(n / 1000).toStringAsFixed(1)}k';
-    if (n < 1000000) return '${(n / 1000).round()}k';
-    return '${(n / 1000000).toStringAsFixed(1)}M';
+    final s = n.abs().toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return (n < 0 ? '-' : '') + buf.toString();
   }
 }

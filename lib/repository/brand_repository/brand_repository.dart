@@ -25,6 +25,13 @@ abstract class BrandRepository {
     required File file,
   });
   Future<void> deleteAsset(String assetId);
+
+  /// PATCH /api/v1/brand/assets/{id} — set the asset's primary flag.
+  ///
+  /// This route is NOT documented in the backend brief (only POST/GET/DELETE
+  /// ship today). Callers should be ready for a 404/405 [ApiException] and
+  /// fall back to a "re-upload to set primary" message.
+  Future<BrandAssetModel> patchAsset(String assetId, {required bool isPrimary});
 }
 
 class BrandRepositoryImpl implements BrandRepository {
@@ -101,6 +108,17 @@ class BrandRepositoryImpl implements BrandRepository {
   Future<void> deleteAsset(String assetId) {
     return unwrapDio(() async {
       await _dio.delete<dynamic>('/api/v1/brand/assets/$assetId');
+    });
+  }
+
+  @override
+  Future<BrandAssetModel> patchAsset(String assetId, {required bool isPrimary}) {
+    return unwrapDio(() async {
+      final response = await _dio.patch<dynamic>(
+        '/api/v1/brand/assets/$assetId',
+        data: <String, dynamic>{'is_primary': isPrimary},
+      );
+      return BrandAssetModel.fromJson(response.data as Map<String, dynamic>);
     });
   }
 }

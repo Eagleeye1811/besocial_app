@@ -4,10 +4,24 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/theme_constants.dart';
 import '../../../data/dto/dashboard_trending_dto.dart';
 
-/// One card in the "Trending in your niche" horizontal carousel.
+/// One card in the "Trending in your niche" horizontal carousel. Mirrors the
+/// web `TrendingCard`: thumbnail with a format badge and an overlay heart that
+/// toggles the post into the shortlist.
 class TrendingCard extends StatelessWidget {
   final DashboardTrendingPostDto post;
-  const TrendingCard({super.key, required this.post});
+
+  /// Whether this post is currently shortlisted (drives the filled heart).
+  final bool shortlisted;
+
+  /// Fired when the heart is tapped. Null leaves the card read-only.
+  final VoidCallback? onShortlist;
+
+  const TrendingCard({
+    super.key,
+    required this.post,
+    this.shortlisted = false,
+    this.onShortlist,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +78,15 @@ class TrendingCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onShortlist != null)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: _HeartButton(
+                        shortlisted: shortlisted,
+                        onTap: onShortlist!,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -90,7 +113,7 @@ class TrendingCard extends StatelessWidget {
                           size: 12, color: AppColors.ink3),
                       const SizedBox(width: 4),
                       Text(
-                        _compactNumber(post.likeCount),
+                        '${_compactNumber(post.likeCount)} likes',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppColors.ink3,
@@ -107,10 +130,54 @@ class TrendingCard extends StatelessWidget {
     );
   }
 
+  // Thousands-separated, matching the web's `formatNumber(like_count)`.
   static String _compactNumber(int n) {
-    if (n < 1000) return '$n';
-    if (n < 10000) return '${(n / 1000).toStringAsFixed(1)}k';
-    if (n < 1000000) return '${(n / 1000).round()}k';
-    return '${(n / 1000000).toStringAsFixed(1)}M';
+    final s = n.abs().toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return (n < 0 ? '-' : '') + buf.toString();
+  }
+}
+
+/// Round overlay heart. Filled accent when shortlisted, translucent white
+/// outline otherwise — mirrors the web card's top-right shortlist button.
+class _HeartButton extends StatelessWidget {
+  final bool shortlisted;
+  final VoidCallback onTap;
+  const _HeartButton({required this.shortlisted, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: shortlisted
+              ? AppColors.accent
+              : Colors.white.withValues(alpha: 0.92),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: shortlisted ? AppColors.accent : AppColors.line,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Icon(
+          shortlisted ? Icons.favorite : Icons.favorite_border,
+          size: 15,
+          color: shortlisted ? Colors.white : AppColors.ink2,
+        ),
+      ),
+    );
   }
 }

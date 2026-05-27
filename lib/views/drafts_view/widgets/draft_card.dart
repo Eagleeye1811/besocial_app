@@ -8,22 +8,63 @@ import '../../../data/models/draft_model.dart';
 import 'post_detail_sheet.dart';
 
 /// One row in the drafts list. Square thumbnail on the left, caption +
-/// source attribution + meta on the right.
-class DraftCard extends StatelessWidget {
+/// source attribution + meta on the right, and an Instagram-aware primary
+/// action (Post to Instagram when connected, Download otherwise).
+class DraftCard extends StatefulWidget {
   final DraftModel draft;
   const DraftCard({super.key, required this.draft});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = Get.find<DraftsController>();
+  State<DraftCard> createState() => _DraftCardState();
+}
 
+class _DraftCardState extends State<DraftCard> {
+  final DraftsController _controller = Get.find<DraftsController>();
+  bool _busy = false;
+
+  DraftModel get draft => widget.draft;
+
+  void _openSheet() {
+    PostDetailSheet.show(
+      context,
+      draft: draft,
+      controller: _controller,
+    );
+  }
+
+  Future<void> _post() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final result = await _controller.postToInstagram(draft.jobId);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (result != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Posted to Instagram.')),
+      );
+    }
+  }
+
+  Future<void> _download() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    // The list payload doesn't carry slide URLs, so the controller fetches
+    // the job before opening each image externally.
+    final launched = await _controller.downloadSlides(draft.jobId);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (launched == null || launched == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't open images to download.")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: () => PostDetailSheet.show(
-        context,
-        draft: draft,
-        controller: controller,
-      ),
+      onTap: _openSheet,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -79,6 +120,8 @@ class DraftCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  _action(),
                 ],
               ),
             ),
@@ -86,6 +129,52 @@ class DraftCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _action() {
+    return Obx(() {
+      final connected = _controller.isInstagramConnected.value;
+      final label = _busy
+          ? (connected ? 'Posting…' : 'Opening…')
+          : connected
+              ? 'Post to Instagram'
+              : draft.slideCount > 1
+                  ? 'Download images'
+                  : 'Download image';
+      return SizedBox(
+        height: 34,
+        child: connected
+            ? ElevatedButton.icon(
+                icon: _icon(Icons.send),
+                label: Text(label, style: const TextStyle(fontSize: 12.5)),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: _busy ? null : _post,
+              )
+            : OutlinedButton.icon(
+                icon: _icon(Icons.download),
+                label: Text(label, style: const TextStyle(fontSize: 12.5)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  visualDensity: VisualDensity.compact,
+                ),
+                onPressed: _busy ? null : _download,
+              ),
+      );
+    });
+  }
+
+  Widget _icon(IconData icon) {
+    if (_busy) {
+      return const SizedBox(
+        width: 13,
+        height: 13,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    return Icon(icon, size: 14);
   }
 
   Widget _thumbnail() {

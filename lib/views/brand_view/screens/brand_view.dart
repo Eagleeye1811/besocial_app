@@ -95,7 +95,7 @@ class _Header extends GetView<BrandController> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Brand',
+          'Brand Studio',
           style: TextStyle(
             fontFamily: AppFonts.display,
             fontFamilyFallback: AppFonts.displayFallback,
@@ -107,7 +107,7 @@ class _Header extends GetView<BrandController> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Edit how every AI-generated post sounds and looks.',
+          'How Growgram sees your brand. Changes apply to future generations.',
           style: TextStyle(fontSize: 13, color: AppColors.ink3),
         ),
       ],

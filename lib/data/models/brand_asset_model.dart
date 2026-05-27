@@ -60,4 +60,16 @@ class BrandAssetModel {
       _$BrandAssetModelFromJson(json);
 
   Map<String, dynamic> toJson() => _$BrandAssetModelToJson(this);
+
+  /// Immutable copy with selected fields overridden. Used by the controller's
+  /// optimistic set-primary flip.
+  BrandAssetModel copyWith({bool? isPrimary}) => BrandAssetModel(
+        assetId: assetId,
+        type: type,
+        label: label,
+        filePath: filePath,
+        isPrimary: isPrimary ?? this.isPrimary,
+        uploadedAt: uploadedAt,
+        metadata: metadata,
+      );
 }

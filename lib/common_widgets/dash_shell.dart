@@ -3,35 +3,44 @@ import 'package:get/get.dart';
 
 import '../core/routes/app_routes.dart';
 import '../core/theme/theme_constants.dart';
+import 'dash_top_bar.dart';
 
 /// Bottom-nav scaffold shared by every signed-in dashboard surface
-/// (Home, Discover, Shortlist, Drafts, Brand). Mirrors the web's
+/// (Home, Discover, Shortlist, Drafts, Calendar, Brand). Mirrors the web's
 /// `DashShell.jsx`. Tapping a tab does an `offAllNamed` so we don't pile
-/// up routes — the dashboard is a flat 5-way selector, not a stack.
+/// up routes — the dashboard is a flat 6-way selector, not a stack.
 class DashShell extends StatelessWidget {
   final DashTab currentTab;
   final Widget body;
+
+  /// Top bar. Defaults to the shared [DashTopBar] (logo + wordmark +
+  /// settings); pass a different bar, or `null` via [hideAppBar], to override.
   final PreferredSizeWidget? appBar;
+
+  /// Set when a surface wants no top bar at all (the default bar is used
+  /// otherwise, since `appBar == null` can't distinguish "unset" from "none").
+  final bool hideAppBar;
 
   const DashShell({
     super.key,
     required this.currentTab,
     required this.body,
     this.appBar,
+    this.hideAppBar = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: appBar,
+      appBar: hideAppBar ? null : (appBar ?? const DashTopBar()),
       body: body,
       bottomNavigationBar: _DashBottomNav(currentTab: currentTab),
     );
   }
 }
 
-enum DashTab { home, discover, shortlist, drafts, brand }
+enum DashTab { home, discover, shortlist, drafts, calendar, brand }
 
 extension DashTabRoute on DashTab {
   String get route {
@@ -44,6 +53,8 @@ extension DashTabRoute on DashTab {
         return AppRoutes.shortlist;
       case DashTab.drafts:
         return AppRoutes.drafts;
+      case DashTab.calendar:
+        return AppRoutes.calendar;
       case DashTab.brand:
         return AppRoutes.brand;
     }
@@ -62,6 +73,8 @@ class _DashBottomNav extends StatelessWidget {
         'Shortlist'),
     _NavEntry(DashTab.drafts, Icons.edit_note_outlined, Icons.edit_note,
         'Drafts'),
+    _NavEntry(DashTab.calendar, Icons.calendar_today_outlined,
+        Icons.calendar_today, 'Calendar'),
     _NavEntry(DashTab.brand, Icons.palette_outlined, Icons.palette, 'Brand'),
   ];
 

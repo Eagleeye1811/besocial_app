@@ -20,7 +20,7 @@ BrandPatchDto _$BrandPatchDtoFromJson(Map<String, dynamic> json) =>
       voiceToneId: json['voice_tone_id'] as String?,
       aestheticTheme: json['aesthetic_theme'] as String?,
       facePreference: json['face_preference'] as String?,
-      faceInContent: json['face_in_content'] as bool?,
+      faceInContent: json['face_in_content'] as String?,
       contentPillars: (json['content_pillars'] as List<dynamic>?)
           ?.map((e) => e as String)
           .toList(),

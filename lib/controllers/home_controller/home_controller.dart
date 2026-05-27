@@ -9,9 +9,12 @@ import '../../data/dto/dashboard_recent_post_dto.dart';
 import '../../data/dto/dashboard_trending_dto.dart';
 import '../../repository/dashboard_repository/dashboard_repository.dart';
 
-/// Owns the three lists on `/home`. Each is loaded in parallel on `onReady`,
-/// each has its own error/loading flag so a flaky carousel doesn't take down
-/// the whole screen. Mirrors `frontend/src/features/dashboard/store.js`.
+/// Drives `/home`. Mirrors `frontend/src/features/dashboard/pages/HomePage.jsx`
+/// one-for-one: a single effect fires `getDashboardHome()`, `getRecentPosts(5)`
+/// and `getTrending(5)` in parallel (`Promise.all`), surfaces the first
+/// failure as one page-level error, and otherwise commits all three payloads
+/// together. The trending-heart shortlist state mirrors the web store's
+/// `shortlistedFromTrending` map.
 class HomeController extends GetxController {
   final DashboardRepository _repo = GetIt.I<DashboardRepository>();
   final LoggerService _log = GetIt.I<LoggerService>();
@@ -22,13 +25,17 @@ class HomeController extends GetxController {
   final RxList<DashboardTrendingPostDto> trending =
       <DashboardTrendingPostDto>[].obs;
 
-  final RxBool isLoadingHome = false.obs;
-  final RxBool isLoadingRecent = false.obs;
-  final RxBool isLoadingTrending = false.obs;
+  /// Optimistic shortlist set for trending cards, keyed by `post_id`. Web
+  /// equivalent: `useDashboardStore.shortlistedFromTrending`.
+  final RxMap<String, bool> shortlistedFromTrending = <String, bool>{}.obs;
 
-  final RxnString homeError = RxnString();
-  final RxnString recentError = RxnString();
-  final RxnString trendingError = RxnString();
+  /// True while the combined initial / pull-to-refresh load is in flight —
+  /// the web's single `loading` flag.
+  final RxBool isLoading = true.obs;
+
+  /// First failure from the parallel load, already mapped to copy — the web's
+  /// single `error` string.
+  final RxnString error = RxnString();
 
   @override
   void onReady() {
@@ -36,52 +43,54 @@ class HomeController extends GetxController {
     refreshAll();
   }
 
+  /// Parallel fetch of the three home reads. Mirrors HomePage.jsx's effect:
+  /// `Promise.all([...])` then a `find((r) => !r.success)` first-error gate.
+  /// `unwrapDio` makes any failed call throw `ApiException`, so the first
+  /// rejection short-circuits `Future.wait` exactly like the web's firstError.
   Future<void> refreshAll() async {
-    await Future.wait<void>([
-      _loadHome(),
-      _loadRecent(),
-      _loadTrending(),
-    ]);
-  }
-
-  Future<void> _loadHome() async {
-    isLoadingHome.value = true;
-    homeError.value = null;
+    isLoading.value = true;
+    error.value = null;
     try {
-      home.value = await _repo.getHome();
+      final results = await Future.wait<Object>([
+        _repo.getHome(),
+        _repo.getRecentPosts(),
+        _repo.getTrending(),
+      ]);
+      home.value = results[0] as DashboardHomeDto;
+      recentPosts.assignAll(results[1] as List<DashboardRecentPostDto>);
+      trending.assignAll(results[2] as List<DashboardTrendingPostDto>);
     } on ApiException catch (e) {
-      homeError.value = resolveApiExceptionMessage(e);
-      _log.w('GET /dashboard/home failed: ${e.code}');
+      error.value = resolveApiExceptionMessage(e);
+      _log.w('Home dashboard load failed: ${e.code}');
+    } catch (e) {
+      error.value = 'Could not load home dashboard.';
+      _log.e('Home dashboard load failed unexpectedly', error: e);
     } finally {
-      isLoadingHome.value = false;
+      isLoading.value = false;
     }
   }
 
-  Future<void> _loadRecent() async {
-    isLoadingRecent.value = true;
-    recentError.value = null;
+  bool isShortlisted(String postId) => shortlistedFromTrending[postId] ?? false;
+
+  /// Optimistic shortlist toggle from a trending card's heart. Mirrors
+  /// HomePage.jsx `handleToggleTrendingShortlist`: flip locally first, derive
+  /// the action from the pre-toggle value (`shortlisted` to add, `skipped` to
+  /// remove), fire the swipe, and revert on failure.
+  Future<void> toggleTrendingShortlist(DashboardTrendingPostDto post) async {
+    final wasShortlisted = isShortlisted(post.postId);
+    _setShortlisted(post.postId, !wasShortlisted);
+
+    final action = wasShortlisted ? 'skipped' : 'shortlisted';
     try {
-      final posts = await _repo.getRecentPosts();
-      recentPosts.assignAll(posts);
+      await _repo.swipeDiscover(postId: post.postId, action: action);
     } on ApiException catch (e) {
-      recentError.value = resolveApiExceptionMessage(e);
-      _log.w('GET /dashboard/recent-posts failed: ${e.code}');
-    } finally {
-      isLoadingRecent.value = false;
+      _setShortlisted(post.postId, wasShortlisted);
+      _log.e('Failed to update shortlist: ${e.code}');
     }
   }
 
-  Future<void> _loadTrending() async {
-    isLoadingTrending.value = true;
-    trendingError.value = null;
-    try {
-      final posts = await _repo.getTrending();
-      trending.assignAll(posts);
-    } on ApiException catch (e) {
-      trendingError.value = resolveApiExceptionMessage(e);
-      _log.w('GET /dashboard/trending failed: ${e.code}');
-    } finally {
-      isLoadingTrending.value = false;
-    }
+  void _setShortlisted(String postId, bool value) {
+    shortlistedFromTrending[postId] = value;
+    shortlistedFromTrending.refresh();
   }
 }

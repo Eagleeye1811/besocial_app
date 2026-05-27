@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../../controllers/drafts_controller/drafts_controller.dart';
 import '../../../core/theme/theme_constants.dart';
@@ -44,6 +45,7 @@ class _PostDetailSheetState extends State<PostDetailSheet> {
   GenerationJobModel? _job;
   bool _loadingJob = true;
   bool _posting = false;
+  bool _downloading = false;
 
   @override
   void initState() {
@@ -73,6 +75,22 @@ class _PostDetailSheetState extends State<PostDetailSheet> {
       // confirmation here for success since we know the result shape.
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Posted to Instagram.')),
+      );
+    }
+  }
+
+  Future<void> _download() async {
+    if (_downloading) return;
+    setState(() => _downloading = true);
+    final launched = await widget.controller.downloadSlides(
+      widget.draft.jobId,
+      slides: _job?.slides,
+    );
+    if (!mounted) return;
+    setState(() => _downloading = false);
+    if (launched == null || launched == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't open images to download.")),
       );
     }
   }
@@ -110,8 +128,12 @@ class _PostDetailSheetState extends State<PostDetailSheet> {
           ),
           _ActionBar(
             posting: _posting,
+            downloading: _downloading,
             enabled: _job?.status == GenerationJobStatus.completed,
+            slideCount: _job?.slides.length ?? widget.draft.slideCount,
+            connected: widget.controller.isInstagramConnected,
             onPost: _post,
+            onDownload: _download,
           ),
         ],
       ),
@@ -335,13 +357,21 @@ class _CaptionBlock extends StatelessWidget {
 
 class _ActionBar extends StatelessWidget {
   final bool posting;
+  final bool downloading;
   final bool enabled;
+  final int slideCount;
+  final RxBool connected;
   final VoidCallback onPost;
+  final VoidCallback onDownload;
 
   const _ActionBar({
     required this.posting,
+    required this.downloading,
     required this.enabled,
+    required this.slideCount,
+    required this.connected,
     required this.onPost,
+    required this.onDownload,
   });
 
   @override
@@ -354,34 +384,77 @@ class _ActionBar extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+        child: Obx(() {
+          final isConnected = connected.value;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!isConnected) ...[
+                Text(
+                  'Connect Instagram to post directly.',
+                  style: TextStyle(fontSize: 11.5, color: AppColors.ink3),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: isConnected
+                        ? _primaryButton(
+                            busy: posting,
+                            icon: Icons.send,
+                            label: posting ? 'Posting…' : 'Post to Instagram',
+                            onPressed:
+                                (posting || !enabled) ? null : onPost,
+                          )
+                        : _primaryButton(
+                            busy: downloading,
+                            icon: Icons.download,
+                            label: downloading
+                                ? 'Opening…'
+                                : slideCount > 1
+                                    ? 'Download images'
+                                    : 'Download image',
+                            onPressed:
+                                (downloading || !enabled) ? null : onDownload,
+                          ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton.icon(
-                icon: posting
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.white,
-                        ),
-                      )
-                    : const Icon(Icons.send, size: 16),
-                label: Text(posting ? 'Posting…' : 'Post to Instagram'),
-                onPressed: (posting || !enabled) ? null : onPost,
-              ),
-            ),
-          ],
-        ),
+            ],
+          );
+        }),
       ),
+    );
+  }
+
+  Widget _primaryButton({
+    required bool busy,
+    required IconData icon,
+    required String label,
+    required VoidCallback? onPressed,
+  }) {
+    return ElevatedButton.icon(
+      icon: busy
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.white,
+              ),
+            )
+          : Icon(icon, size: 16),
+      label: Text(label, overflow: TextOverflow.ellipsis),
+      onPressed: onPressed,
     );
   }
 }

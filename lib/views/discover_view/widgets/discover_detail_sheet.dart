@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../controllers/discover_controller/discover_controller.dart';
 import '../../../core/theme/theme_constants.dart';
@@ -57,6 +58,10 @@ class DiscoverDetailSheet extends StatelessWidget {
                 _Header(post: post),
                 const SizedBox(height: 12),
                 _Carousel(images: images),
+                const SizedBox(height: 16),
+                _EngagementStrip(post: post, slideFallback: images.length),
+                const SizedBox(height: 12),
+                _InstagramButton(shortcode: post.shortcode),
                 const SizedBox(height: 16),
                 if (post.caption.isNotEmpty) ...[
                   Text(
@@ -147,6 +152,137 @@ class _MetaPill extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: AppColors.ink2,
+        ),
+      ),
+    );
+  }
+}
+
+/// Likes / comments / slides metrics row. Mirrors the web detail modal's
+/// engagement strip (the hardcoded "match score" cell is omitted — there is
+/// no backend signal for it on mobile).
+class _EngagementStrip extends StatelessWidget {
+  final DiscoverPostModel post;
+  final int slideFallback;
+  const _EngagementStrip({required this.post, required this.slideFallback});
+
+  @override
+  Widget build(BuildContext context) {
+    final slides = post.slideCount > 0 ? post.slideCount : slideFallback;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _Metric(value: _formatNumber(post.likeCount), label: 'likes'),
+          _divider(),
+          _Metric(value: _formatNumber(post.commentCount), label: 'comments'),
+          _divider(),
+          _Metric(value: '$slides', label: slides == 1 ? 'slide' : 'slides'),
+        ],
+      ),
+    );
+  }
+
+  Widget _divider() => Container(
+        width: 1,
+        height: 28,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        color: AppColors.line2,
+      );
+
+  static String _formatNumber(int n) {
+    final s = n.toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
+}
+
+class _Metric extends StatelessWidget {
+  final String value;
+  final String label;
+  const _Metric({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: AppFonts.display,
+            fontFamilyFallback: AppFonts.displayFallback,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            height: 1,
+            letterSpacing: -0.3,
+            color: AppColors.ink,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: AppFonts.ui,
+            fontFamilyFallback: AppFonts.uiFallback,
+            fontSize: 11,
+            color: AppColors.ink3,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "View on Instagram" — opens https://www.instagram.com/p/{shortcode}/ in
+/// the external browser / IG app. Hidden when no shortcode is present.
+class _InstagramButton extends StatelessWidget {
+  final String shortcode;
+  const _InstagramButton({required this.shortcode});
+
+  Future<void> _open() async {
+    if (shortcode.isEmpty) return;
+    final uri = Uri.parse('https://www.instagram.com/p/$shortcode/');
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok) {
+        Get.snackbar(
+          "Couldn't open Instagram",
+          'No app was able to handle this link.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    } catch (_) {
+      Get.snackbar(
+        "Couldn't open Instagram",
+        'No app was able to handle this link.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (shortcode.isEmpty) return const SizedBox.shrink();
+    return OutlinedButton.icon(
+      onPressed: _open,
+      icon: const Icon(Icons.camera_alt_outlined, size: 16),
+      label: const Text('View on Instagram'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.ink2,
+        side: const BorderSide(color: AppColors.line),
+        backgroundColor: AppColors.surface,
+        minimumSize: const Size.fromHeight(44),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
         ),
       ),
     );

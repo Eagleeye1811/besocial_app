@@ -28,13 +28,17 @@ class ShortlistItemModelAdapter extends TypeAdapter<ShortlistItemModel> {
       generationStatus: fields[8] as ShortlistGenerationStatus,
       generationJobId: fields[9] as String?,
       shortlistedAt: fields[10] as DateTime,
+      extractionStatus: fields[11] as String?,
+      extractedSlideTexts: (fields[12] as List?)?.cast<String>(),
+      generationError: fields[13] as String?,
+      generationErrorCode: fields[14] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ShortlistItemModel obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.postId)
       ..writeByte(1)
@@ -56,7 +60,15 @@ class ShortlistItemModelAdapter extends TypeAdapter<ShortlistItemModel> {
       ..writeByte(9)
       ..write(obj.generationJobId)
       ..writeByte(10)
-      ..write(obj.shortlistedAt);
+      ..write(obj.shortlistedAt)
+      ..writeByte(11)
+      ..write(obj.extractionStatus)
+      ..writeByte(12)
+      ..write(obj.extractedSlideTexts)
+      ..writeByte(13)
+      ..write(obj.generationError)
+      ..writeByte(14)
+      ..write(obj.generationErrorCode);
   }
 
   @override
@@ -139,6 +151,12 @@ ShortlistItemModel _$ShortlistItemModelFromJson(Map<String, dynamic> json) =>
           _$ShortlistGenerationStatusEnumMap, json['generation_status']),
       generationJobId: json['generation_job_id'] as String?,
       shortlistedAt: DateTime.parse(json['shortlisted_at'] as String),
+      extractionStatus: json['extraction_status'] as String?,
+      extractedSlideTexts: (json['extracted_slide_texts'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      generationError: json['generation_error'] as String?,
+      generationErrorCode: json['generation_error_code'] as String?,
     );
 
 Map<String, dynamic> _$ShortlistItemModelToJson(ShortlistItemModel instance) =>
@@ -155,6 +173,10 @@ Map<String, dynamic> _$ShortlistItemModelToJson(ShortlistItemModel instance) =>
           _$ShortlistGenerationStatusEnumMap[instance.generationStatus]!,
       'generation_job_id': instance.generationJobId,
       'shortlisted_at': instance.shortlistedAt.toIso8601String(),
+      'extraction_status': instance.extractionStatus,
+      'extracted_slide_texts': instance.extractedSlideTexts,
+      'generation_error': instance.generationError,
+      'generation_error_code': instance.generationErrorCode,
     };
 
 const _$ShortlistGenerationStatusEnumMap = {

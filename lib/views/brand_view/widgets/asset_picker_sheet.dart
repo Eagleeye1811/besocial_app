@@ -13,9 +13,14 @@ import '../../../data/models/brand_asset_model.dart';
 /// (iOS) and (optionally) `NSCameraUsageDescription` in `Info.plist` for the
 /// `image_picker` flow to succeed.
 class AssetPickerSheet extends StatefulWidget {
-  const AssetPickerSheet({super.key});
+  /// When non-null, the type chooser is hidden and locked to this type
+  /// (the section opens the picker pre-scoped to a sub-grid). Mirrors the
+  /// web's `lockedType` on AssetPickerModal.
+  final BrandAssetType? lockedType;
 
-  static Future<void> show(BuildContext context) {
+  const AssetPickerSheet({super.key, this.lockedType});
+
+  static Future<void> show(BuildContext context, {BrandAssetType? lockedType}) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -23,7 +28,7 @@ class AssetPickerSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => const AssetPickerSheet(),
+      builder: (_) => AssetPickerSheet(lockedType: lockedType),
     );
   }
 
@@ -35,9 +40,15 @@ class _AssetPickerSheetState extends State<AssetPickerSheet> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _label = TextEditingController();
   File? _file;
-  BrandAssetType _type = BrandAssetType.face;
+  late BrandAssetType _type;
   bool _primary = false;
   bool _uploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _type = widget.lockedType ?? BrandAssetType.face;
+  }
 
   @override
   void dispose() {
@@ -125,8 +136,10 @@ class _AssetPickerSheetState extends State<AssetPickerSheet> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _typePicker(),
-                const SizedBox(height: 14),
+                if (widget.lockedType == null) ...[
+                  _typePicker(),
+                  const SizedBox(height: 14),
+                ],
                 TextField(
                   controller: _label,
                   decoration: const InputDecoration(
