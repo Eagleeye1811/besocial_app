@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
 import '../core/routes/app_routes.dart';
@@ -28,11 +27,7 @@ class DashTopBar extends StatelessWidget implements PreferredSizeWidget {
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SvgPicture.asset(
-            'assets/images/growgram_logo.svg',
-            height: 26,
-            semanticsLabel: 'Growgram logo',
-          ),
+          const GrowgramLogo(size: 26),
           const SizedBox(width: 9),
           Text(
             'Growgram',
@@ -62,4 +57,59 @@ class DashTopBar extends StatelessWidget implements PreferredSizeWidget {
       ),
     );
   }
+}
+
+/// The Growgram mark, drawn natively so it always renders (no SVG/asset
+/// dependency). A dark rounded-square badge with two orange bars — identical
+/// to the website's `Icon name="logo"` (24×24 viewBox, `#18181B` square,
+/// `#F47B42` glyph).
+class GrowgramLogo extends StatelessWidget {
+  final double size;
+  const GrowgramLogo({super.key, this.size = 26});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _GrowgramLogoPainter()),
+    );
+  }
+}
+
+class _GrowgramLogoPainter extends CustomPainter {
+  static const Color _badge = Color(0xFF18181B);
+  static const Color _glyph = Color(0xFFF47B42);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Everything is authored in the 24-unit SVG viewBox, then scaled.
+    final s = size.width / 24.0;
+    Rect r(double l, double t, double rt, double b) =>
+        Rect.fromLTRB(l * s, t * s, rt * s, b * s);
+
+    // Dark rounded-square badge.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(7 * s)),
+      Paint()..color = _badge,
+    );
+
+    // Two orange bars (left edges square, right ends rounded — matching the
+    // SVG path), the lower bar slightly wider.
+    final cap = Radius.circular(2.7 * s);
+    final glyph = Paint()..color = _glyph;
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(r(7.5, 7.5, 16.4, 12.9),
+          topRight: cap, bottomRight: cap),
+      glyph,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(r(7.5, 12.9, 17.6, 18.3),
+          topRight: cap, bottomRight: cap),
+      glyph,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

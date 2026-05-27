@@ -10,11 +10,13 @@ import '../../core/services/logger_service.dart';
 import '../../data/models/discover_post_model.dart';
 import '../../repository/discover_repository/discover_repository.dart';
 
-/// Discover surface view modes — mirrors the web `ModeToggle` (Grid | Swipe).
-enum DiscoverViewMode { grid, swipe }
-
-/// Drives `/discover`. Owns a [CursorPager] for the paginated grid plus
-/// two side-cars: the format filter and the auto-refresh countdown state.
+/// Drives `/discover`, mirroring the web `DiscoverPage`. Owns the format
+/// filter, a [CursorPager] feeding the masonry grid, the optimistic
+/// shortlist set shared by the grid hearts and the detail modal, and the
+/// 12-hour auto-refresh countdown.
+///
+/// Shortlisting toggles a post in place — it never removes the post from the
+/// feed (matching the web, where the heart simply fills/empties).
 class DiscoverController extends GetxController {
   final DiscoverRepository _repo = GetIt.I<DiscoverRepository>();
   final LoggerService _log = GetIt.I<LoggerService>();
@@ -23,22 +25,13 @@ class DiscoverController extends GetxController {
 
   final Rx<DiscoverFormat> selectedFormat = DiscoverFormat.all.obs;
 
-  /// Grid vs. swipe presentation. Defaults to grid (the existing surface).
-  final Rx<DiscoverViewMode> viewMode = DiscoverViewMode.grid.obs;
+  /// Optimistic shortlist set, keyed by `post_id`. Shared by the grid heart
+  /// and the detail modal CTA. Mirrors the web `shortlistedIds` map.
+  final RxMap<String, bool> shortlistedIds = <String, bool>{}.obs;
 
-  /// Count of posts shortlisted this session — drives the swipe-view counter.
-  final RxInt sessionShortlistCount = 0.obs;
-
-  /// History of posts skipped in swipe mode, newest last. Powers "Undo last
-  /// skip" which re-inserts the post at the front of the pager (mirrors web,
-  /// which restores locally without a server round-trip).
-  final RxList<DiscoverPostModel> skippedHistory = <DiscoverPostModel>[].obs;
-
-  // Refresh-cadence state, sourced from the latest feed response.
+  // 12-hour refresh cadence, sourced from the latest feed response.
   final Rxn<DateTime> nextRefreshAt = Rxn<DateTime>();
   final Rxn<Duration> timeUntilRefresh = Rxn<Duration>();
-  final RxBool isManualRefreshing = false.obs;
-  final RxnString refreshError = RxnString();
 
   Timer? _countdownTimer;
 
@@ -72,7 +65,7 @@ class DiscoverController extends GetxController {
   }
 
   // ===========================================
-  // Format filter
+  // Format filter — resets the deck (web: handleFormatChange).
   // ===========================================
   Future<void> setFormat(DiscoverFormat format) async {
     if (selectedFormat.value == format) return;
@@ -81,83 +74,36 @@ class DiscoverController extends GetxController {
   }
 
   // ===========================================
-  // View mode
+  // Shortlist toggle — optimistic, with rollback on failure. Never removes
+  // the post from the feed. Web: handleShortlistToggle.
   // ===========================================
-  void setViewMode(DiscoverViewMode mode) {
-    if (viewMode.value == mode) return;
-    viewMode.value = mode;
-  }
+  bool isShortlisted(String postId) => shortlistedIds[postId] ?? false;
 
-  // ===========================================
-  // Swipe
-  // ===========================================
-  Future<void> shortlist(DiscoverPostModel post) async {
-    final ok = await _swipeAndRemove(post, 'shortlisted');
-    if (ok) sessionShortlistCount.value++;
-  }
-
-  Future<void> skip(DiscoverPostModel post) async {
-    final ok = await _swipeAndRemove(post, 'skipped');
-    if (ok) {
-      skippedHistory.add(post);
+  Future<void> toggleShortlist(DiscoverPostModel post) async {
+    final wasShortlisted = isShortlisted(post.postId);
+    // Optimistic flip (RxMap []=/remove auto-notify).
+    if (wasShortlisted) {
+      shortlistedIds.remove(post.postId);
+    } else {
+      shortlistedIds[post.postId] = true;
     }
-  }
 
-  /// Re-inserts the most recently skipped post at the front of the pager so
-  /// it becomes the current swipe card again. Mirrors the web behaviour of a
-  /// purely local restore — no opposite-action server call.
-  void undoLastSkip() {
-    if (skippedHistory.isEmpty) return;
-    final post = skippedHistory.removeLast();
-    if (pager.items.any((p) => p.postId == post.postId)) return;
-    pager.items.insert(0, post);
-  }
-
-  /// Optimistically drops [post] from the visible feed; restores on failure.
-  /// Returns `true` when the swipe was accepted by the backend.
-  Future<bool> _swipeAndRemove(DiscoverPostModel post, String action) async {
-    final originalIndex = pager.items.indexWhere((p) => p.postId == post.postId);
-    if (originalIndex < 0) return false;
-    pager.items.removeAt(originalIndex);
+    final action = wasShortlisted ? 'skipped' : 'shortlisted';
     try {
       await _repo.swipe(postId: post.postId, action: action);
-      return true;
     } on ApiException catch (e) {
-      pager.items.insert(originalIndex, post);
+      // Roll back.
+      if (wasShortlisted) {
+        shortlistedIds[post.postId] = true;
+      } else {
+        shortlistedIds.remove(post.postId);
+      }
       Get.snackbar(
-        action == 'shortlisted' ? 'Heart failed' : 'Skip failed',
+        'Could not update shortlist',
         resolveApiExceptionMessage(e),
         snackPosition: SnackPosition.BOTTOM,
       );
-      _log.w('Swipe failed: ${e.code}');
-      return false;
-    }
-  }
-
-  // ===========================================
-  // Manual refresh
-  // ===========================================
-  Future<void> triggerManualRefresh() async {
-    if (isManualRefreshing.value) return;
-    isManualRefreshing.value = true;
-    refreshError.value = null;
-    try {
-      await _repo.refresh();
-      // Backend has no status endpoint — fall back to a short delay before
-      // re-fetching the feed. Worst-case the grid shows the prior list for
-      // a few seconds longer.
-      await Future<void>.delayed(const Duration(seconds: 8));
-      await pager.loadFirst();
-    } on ApiException catch (e) {
-      if (e.code == 'REFRESH_IN_PROGRESS') {
-        refreshError.value =
-            "We're already pulling fresh posts — give it a few seconds.";
-      } else {
-        refreshError.value = resolveApiExceptionMessage(e);
-      }
-      _log.w('Discover refresh failed: ${e.code}');
-    } finally {
-      isManualRefreshing.value = false;
+      _log.w('Shortlist toggle failed: ${e.code}');
     }
   }
 
@@ -166,8 +112,10 @@ class DiscoverController extends GetxController {
   // ===========================================
   void _startCountdownTimer() {
     _countdownTimer?.cancel();
-    _countdownTimer =
-        Timer.periodic(const Duration(seconds: 30), (_) => _recomputeCountdown());
+    _countdownTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _recomputeCountdown(),
+    );
   }
 
   void _recomputeCountdown() {

@@ -7,80 +7,111 @@ import '../../../core/theme/theme_constants.dart';
 import '../../../data/models/discover_post_model.dart';
 import 'discover_detail_sheet.dart';
 
-/// Two-column grid of discover posts. Tapping a card opens the detail
-/// sheet; the heart button shortlists inline.
+/// Masonry grid of discover posts — the mobile counterpart of the web
+/// `DiscoverGridView`. Two balanced columns with format-driven tile heights,
+/// a format badge, and a persistent bottom overlay (handle · likes · heart).
+/// The heart toggles the shortlist in place; tapping a tile opens the detail
+/// modal. An explicit "Load more" button paginates (matching the web).
 class DiscoverGrid extends GetView<DiscoverController> {
   const DiscoverGrid({super.key});
+
+  // Format-driven tile heights (mobile-scaled from the web's 280/320/240),
+  // so the masonry reads with the same carousel-tallest rhythm.
+  static double _heightFor(String format) {
+    if (format == 'carousel') return 236;
+    if (format == 'video') return 268;
+    return 200;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final items = controller.pager.items;
-      final isLoading = controller.pager.isLoading.value;
+      final posts = controller.pager.items.toList();
 
-      if (items.isEmpty && isLoading) {
-        return const SizedBox(
-          height: 240,
-          child: Center(child: CircularProgressIndicator()),
-        );
-      }
-      if (items.isEmpty) {
-        return _Empty(onRetry: controller.pager.loadFirst);
+      if (posts.isEmpty) return const _EmptyFilter();
+
+      // Balance posts across two columns by running height (masonry).
+      final left = <DiscoverPostModel>[];
+      final right = <DiscoverPostModel>[];
+      var leftH = 0.0;
+      var rightH = 0.0;
+      for (final p in posts) {
+        final h = _heightFor(p.format) + 14;
+        if (leftH <= rightH) {
+          left.add(p);
+          leftH += h;
+        } else {
+          right.add(p);
+          rightH += h;
+        }
       }
 
-      return NotificationListener<ScrollNotification>(
-        onNotification: (note) {
-          if (note.metrics.pixels >= note.metrics.maxScrollExtent - 240) {
-            controller.pager.loadMore();
-          }
-          return false;
-        },
-        child: GridView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.72,
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _MasonryColumn(posts: left)),
+                const SizedBox(width: 14),
+                Expanded(child: _MasonryColumn(posts: right)),
+              ],
+            ),
           ),
-          itemCount: items.length + (controller.pager.hasMore ? 1 : 0),
-          itemBuilder: (_, i) {
-            if (i >= items.length) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return _DiscoverCard(post: items[i]);
-          },
-        ),
+          const _LoadMore(),
+        ],
       );
     });
   }
 }
 
-class _DiscoverCard extends StatelessWidget {
-  final DiscoverPostModel post;
-  const _DiscoverCard({required this.post});
+class _MasonryColumn extends StatelessWidget {
+  final List<DiscoverPostModel> posts;
+  const _MasonryColumn({required this.posts});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return Column(
+      children: [
+        for (var i = 0; i < posts.length; i++)
+          Padding(
+            padding: EdgeInsets.only(bottom: i == posts.length - 1 ? 0 : 14),
+            child: _MasonryCard(
+              post: posts[i],
+              height: DiscoverGrid._heightFor(posts[i].format),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _MasonryCard extends GetView<DiscoverController> {
+  final DiscoverPostModel post;
+  final double height;
+  const _MasonryCard({required this.post, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
       onTap: () => DiscoverDetailSheet.show(context, post: post),
-      borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
           border: Border.all(color: AppColors.line),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppShadows.card,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CachedNetworkImage(
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              height: height,
+              child: post.thumbnailUrl.isEmpty
+                  ? Container(color: AppColors.surface2)
+                  : CachedNetworkImage(
                       imageUrl: post.thumbnailUrl,
                       fit: BoxFit.cover,
                       placeholder: (_, __) =>
@@ -94,76 +125,133 @@ class _DiscoverCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Positioned(
-                      left: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          post.format.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '@${post.authorHandle}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: AppFonts.mono,
-                        fontFamilyFallback: AppFonts.monoFallback,
-                        fontSize: 11,
-                        color: AppColors.ink3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.favorite_outline,
-                            size: 12, color: AppColors.ink3),
-                        const SizedBox(width: 4),
-                        Text(
-                          _compactNumber(post.likeCount),
-                          style:
-                              TextStyle(fontSize: 11, color: AppColors.ink3),
-                        ),
-                        const Spacer(),
-                        _HeartButton(post: post),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+            Positioned(left: 10, top: 10, child: _FormatBadge(post: post)),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _Overlay(post: post),
+            ),
+          ],
         ),
       ),
     );
   }
+}
 
-  static String _compactNumber(int n) {
-    if (n < 1000) return '$n';
-    if (n < 10000) return '${(n / 1000).toStringAsFixed(1)}k';
-    if (n < 1000000) return '${(n / 1000).round()}k';
-    return '${(n / 1000000).toStringAsFixed(1)}M';
+class _FormatBadge extends StatelessWidget {
+  final DiscoverPostModel post;
+  const _FormatBadge({required this.post});
+
+  String get _label {
+    if (post.format.isEmpty) return 'POST';
+    if (post.format == 'carousel') {
+      return post.slideCount > 0 ? 'CAROUSEL · ${post.slideCount}' : 'CAROUSEL';
+    }
+    return post.format.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = post.format == 'carousel'
+        ? Icons.grid_view_rounded
+        : post.format == 'video'
+            ? Icons.play_arrow_rounded
+            : null;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xB81C1B19), // rgba(28,27,25,0.72)
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 11, color: Colors.white),
+            const SizedBox(width: 5),
+          ],
+          Text(
+            _label,
+            style: TextStyle(
+              fontFamily: AppFonts.mono,
+              fontFamilyFallback: AppFonts.monoFallback,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Overlay extends StatelessWidget {
+  final DiscoverPostModel post;
+  const _Overlay({required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 18, 10, 10),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            Color(0xD9181818), // 0.85
+            Color(0x73181818), // 0.45
+            Color(0x00181818),
+          ],
+          stops: [0.0, 0.6, 1.0],
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '@${post.authorHandle}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppFonts.mono,
+                    fontFamilyFallback: AppFonts.monoFallback,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.favorite_border,
+                        size: 11, color: Colors.white70),
+                    const SizedBox(width: 4),
+                    Text(
+                      formatCount(post.likeCount),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _HeartButton(post: post),
+        ],
+      ),
+    );
   }
 }
 
@@ -173,49 +261,103 @@ class _HeartButton extends GetView<DiscoverController> {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => controller.shortlist(post),
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: AppColors.accentSoft,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: const Icon(
-          Icons.favorite,
-          size: 14,
-          color: AppColors.accent,
-        ),
-      ),
+    return GestureDetector(
+      onTap: () => controller.toggleShortlist(post),
+      child: Obx(() {
+        final on = controller.isShortlisted(post.postId);
+        return Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: on ? AppColors.accent : Colors.white.withValues(alpha: 0.92),
+            shape: BoxShape.circle,
+            border: on ? Border.all(color: AppColors.accent) : null,
+          ),
+          child: Icon(
+            on ? Icons.favorite : Icons.favorite_border,
+            size: 15,
+            color: on ? Colors.white : AppColors.ink,
+          ),
+        );
+      }),
     );
   }
 }
 
-class _Empty extends StatelessWidget {
-  final VoidCallback onRetry;
-  const _Empty({required this.onRetry});
+class _LoadMore extends GetView<DiscoverController> {
+  const _LoadMore();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      // Read the observables FIRST so the Obx always tracks something — the
+      // `hasMore` getter is plain (non-reactive), so an early return on it
+      // would leave this Obx observing nothing and trip GetX's guard.
+      final loadingMore =
+          controller.pager.isLoading.value && controller.pager.items.isNotEmpty;
+      if (!controller.pager.hasMore) return const SizedBox(height: 24);
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Center(
+          child: OutlinedButton(
+            onPressed: loadingMore ? null : controller.pager.loadMore,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.ink2,
+              side: const BorderSide(color: AppColors.line),
+              backgroundColor: AppColors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(loadingMore ? 'Loading…' : 'Load more'),
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class _EmptyFilter extends StatelessWidget {
+  const _EmptyFilter();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 64, horizontal: 24),
+      padding: const EdgeInsets.fromLTRB(24, 56, 24, 56),
       child: Column(
         children: [
-          const Icon(Icons.search_off, size: 36, color: AppColors.ink4),
-          const SizedBox(height: 12),
           Text(
-            'No posts to show yet.',
-            style: TextStyle(fontSize: 14, color: AppColors.ink3),
+            'No posts match your filter',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: AppFonts.display,
+              fontFamilyFallback: AppFonts.displayFallback,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.4,
+              color: AppColors.ink,
+            ),
           ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('Try again'),
+          const SizedBox(height: 8),
+          Text(
+            'Switch to "All formats" — we\'ll bring more in as Discover grows.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: AppColors.ink3, height: 1.55),
           ),
         ],
       ),
     );
   }
+}
+
+/// Thousands-separated count, matching the web `formatNumber`.
+String formatCount(int n) {
+  final s = n.abs().toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+    buf.write(s[i]);
+  }
+  return (n < 0 ? '-' : '') + buf.toString();
 }
