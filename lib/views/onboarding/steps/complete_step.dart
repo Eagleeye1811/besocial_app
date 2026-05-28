@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../controllers/onboarding_controller/onboarding_controller.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_constants.dart';
+import '../../../core/utils/responsive.dart';
 import '../widgets/foot_bar.dart';
 import '../widgets/step_shell.dart';
 
@@ -46,7 +47,7 @@ class CompleteStep extends GetView<OnboardingController> {
               style: TextStyle(
                 fontFamily: AppFonts.display,
                 fontFamilyFallback: AppFonts.displayFallback,
-                fontSize: 36,
+                fontSize: Responsive.scale(context, 36),
                 fontWeight: FontWeight.w500,
                 letterSpacing: -1.0,
                 height: 1.05,

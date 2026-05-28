@@ -6,6 +6,7 @@ import '../../../common_widgets/dash_shell.dart';
 import '../../../controllers/home_controller/home_controller.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_constants.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../data/dto/dashboard_home_dto.dart';
 import '../widgets/metric_card.dart';
 import '../widgets/recent_post_card.dart';
@@ -190,7 +191,10 @@ class _MetricsGrid extends StatelessWidget {
       crossAxisCount: 2,
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 1.18,
+      // Slightly taller cells on compact phones so the Best Performer card
+      // (thumbnail + value + caption) doesn't crowd; default phones keep the
+      // designed proportion.
+      childAspectRatio: Responsive.isCompact(context) ? 1.0 : 1.18,
       children: cards,
     );
   }

@@ -22,6 +22,21 @@ class BeSocialApp extends StatelessWidget {
       theme: AppTheme.light,
       initialRoute: AppRoutes.splash,
       getPages: AppRoutes.routes,
+      // Clamp the system text scaler app-wide. Very small system fonts still
+      // shrink text moderately (~0.9×) and accessibility fonts still enlarge
+      // (~1.15×), but extreme values stop breaking fixed-height rows /
+      // single-line labels across the dashboards.
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        final clamped = mq.textScaler.clamp(
+          minScaleFactor: 0.9,
+          maxScaleFactor: 1.15,
+        );
+        return MediaQuery(
+          data: mq.copyWith(textScaler: clamped),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

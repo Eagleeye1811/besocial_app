@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../../../controllers/onboarding_controller/onboarding_controller.dart';
 import '../../../core/theme/theme_constants.dart';
+import '../../../core/utils/responsive.dart';
 import '../widgets/foot_bar.dart';
 import '../widgets/step_shell.dart';
 
@@ -77,7 +78,7 @@ class StyleIntroStep extends GetView<OnboardingController> {
                 style: TextStyle(
                   fontFamily: AppFonts.display,
                   fontFamilyFallback: AppFonts.displayFallback,
-                  fontSize: 38,
+                  fontSize: Responsive.scale(context, 38),
                   fontWeight: FontWeight.w600,
                   letterSpacing: -1.0,
                   height: 1.05,

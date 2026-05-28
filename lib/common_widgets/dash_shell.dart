@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../core/routes/app_routes.dart';
 import '../core/theme/theme_constants.dart';
+import '../core/utils/responsive.dart';
 import 'dash_top_bar.dart';
 
 /// Bottom-nav scaffold shared by every signed-in dashboard surface
@@ -114,8 +115,15 @@ class _DashBottomNav extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           e.label,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 11,
+                            // Slightly tighter on compact phones so 5 labels
+                            // never wrap; otherwise keep the design size.
+                            fontSize:
+                                Responsive.isCompact(context) ? 10 : 11,
                             fontWeight:
                                 isActive ? FontWeight.w600 : FontWeight.w500,
                             color: isActive
