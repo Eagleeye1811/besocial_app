@@ -372,50 +372,24 @@ class _SlideImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        CachedNetworkImage(
-          imageUrl: slide.imageUrl,
-          key: ValueKey<String>(slide.imageUrl),
-          fit: BoxFit.cover,
-          placeholder: (_, __) => Container(color: AppColors.surface2),
-          errorWidget: (context, error, stackTrace) {
-            return Container(
-              color: Colors.grey[200],
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.broken_image,
-                color: Colors.grey,
-                size: 26,
-              ),
-            );
-          },
-        ),
-        if (slide.slideText.isNotEmpty)
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 36,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                slide.slideText,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  height: 1.3,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+    // The generated slide image already has its text rendered into it, so we
+    // show the image alone — no duplicate translucent text overlay.
+    return CachedNetworkImage(
+      imageUrl: slide.imageUrl,
+      key: ValueKey<String>(slide.imageUrl),
+      fit: BoxFit.cover,
+      placeholder: (_, __) => Container(color: AppColors.surface2),
+      errorWidget: (context, error, stackTrace) {
+        return Container(
+          color: Colors.grey[200],
+          alignment: Alignment.center,
+          child: const Icon(
+            Icons.broken_image,
+            color: Colors.grey,
+            size: 26,
           ),
-      ],
+        );
+      },
     );
   }
 }

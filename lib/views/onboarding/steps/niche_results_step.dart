@@ -64,17 +64,20 @@ class NicheResultsStep extends GetView<OnboardingController> {
               followingCount: (profile['following_count'] as num?) ?? 0,
             ),
             const SizedBox(height: 14),
-            _HashtagsCard(
-              confirmed: controller.confirmedHashtags,
-              suggested: controller.suggestedHashtags,
-              onTap: controller.toggleHashtag,
-            ),
+            // Each editor is its own Obx so add/remove toggles rebuild the
+            // chips. (The outer Obx only tracks `niche.value`; passing the
+            // RxLists into a child wouldn't register them as dependencies.)
+            Obx(() => _HashtagsCard(
+                  confirmed: controller.confirmedHashtags.toList(),
+                  suggested: controller.suggestedHashtags.toList(),
+                  onTap: controller.toggleHashtag,
+                )),
             const SizedBox(height: 14),
-            _TopicsCard(
-              confirmed: controller.confirmedTopics,
-              suggested: controller.suggestedTopics,
-              onTap: controller.toggleTopic,
-            ),
+            Obx(() => _TopicsCard(
+                  confirmed: controller.confirmedTopics.toList(),
+                  suggested: controller.suggestedTopics.toList(),
+                  onTap: controller.toggleTopic,
+                )),
             Obx(() {
               final err = controller.errorMessage.value;
               if (err == null) return const SizedBox.shrink();
@@ -460,6 +463,11 @@ class _MetricTile extends StatelessWidget {
 // + suggested (dashed outline, tap to add).
 // ---------------------------------------------------------------------------
 
+/// Render a hashtag with exactly one leading `#`, regardless of whether the
+/// stored value already carries one (the backend sends them prefixed) — avoids
+/// the `##tag` double-hash.
+String _hashLabel(String tag) => '#${tag.replaceFirst(RegExp(r'^#+'), '')}';
+
 class _HashtagsCard extends StatelessWidget {
   final List<String> confirmed;
   final List<String> suggested;
@@ -524,7 +532,7 @@ class _HashtagsCard extends StatelessWidget {
               runSpacing: 6,
               children: confirmed
                   .map((t) => _ConfirmedChip(
-                        label: '#$t',
+                        label: _hashLabel(t),
                         onTap: () => onTap(t),
                       ))
                   .toList(),
@@ -555,7 +563,7 @@ class _HashtagsCard extends StatelessWidget {
               runSpacing: 6,
               children: suggested
                   .map((t) => _SuggestedChip(
-                        label: '#$t',
+                        label: _hashLabel(t),
                         onTap: () => onTap(t),
                       ))
                   .toList(),
